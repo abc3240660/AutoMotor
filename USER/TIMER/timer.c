@@ -1,5 +1,6 @@
 #include "timer.h"
 #include "led.h"
+#include "usart.h"
 
 /*********************************************************************************
 ************************启明欣欣 STM32F407核心开发板******************************
@@ -46,16 +47,13 @@ void TIM2_Init(u16 auto_data,u16 fractional)
 }
 
 //定时器2中断服务函数
-int pluse_num=0;
+int exp_num=0;
 void TIM2_IRQHandler(void)
 {
 	if(TIM_GetITStatus(TIM2,TIM_IT_Update)==SET) //溢出中断
 	{
+		exp_num++;
 		LED1=!LED1;//LED1翻转
-//		BEEP=!BEEP;
-		//脉冲周期=500ms/pluse_num
-		//转速周期 = 脉冲周期*8/转
-		//速度=周长/转速周期
+  	TIM_ClearITPendingBit(TIM2,TIM_IT_Update);  //清除中断标志位
 	}
-	TIM_ClearITPendingBit(TIM2,TIM_IT_Update);  //清除中断标志位
 }

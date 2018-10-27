@@ -1,5 +1,5 @@
 #include "exti.h"
-//#include "delay.h" 
+#include "timer.h" 
 #include "led.h" 
 #include "key.h"
 //#include "beep.h"
@@ -57,14 +57,29 @@ void EXTI4_IRQHandler(void)
 //	}		 
 //	 EXTI_ClearITPendingBit(EXTI_Line4);//清除LINE4上的中断标志位  
 }
-extern int pluse_num;
+extern int exp_num;
 void EXTI9_5_IRQHandler(void)
 {
-	static int i=0;
-	i++;
-	LED2=i&0x01;
+	int cap=0;
+	int exp=0;
+	int total_ms=0;
+	float speed=0;
+	float Freq=0;
+	float trans_rate=0.083333;// 1/12
+	u8 temp[64];
+	//捕获到一次脉冲,获取当前计数值，和溢出次数，然后清零重新开始计算下一下脉冲
+	cap=TIM_GetCounter(TIM2);
+	exp=exp_num;
 	
-	pluse_num++;
+	exp_num=0;
+	TIM_SetCounter(TIM2,0);
+	//计算速度
+	total_ms=cap/10 + 500*exp;//当前获取的计数值+溢出时间=脉冲周期
+	Freq=1.0/total_ms*1000;//霍尔脉冲频率
+	speed=((Freq/8.0)*3.14*0.465*trans_rate);
+	memset(temp,' ',64);
+	sprintf(temp,"total_ms= %d  speed=%f m/s \n",total_ms,speed);
+	uart1SendChars(temp,strlen(temp));
 	EXTI_ClearITPendingBit(EXTI_Line6);
 }
 
