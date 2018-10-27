@@ -65,7 +65,7 @@ void EXTI9_5_IRQHandler(void)
 	int total_ms=0;
 	float speed=0;
 	float Freq=0;
-	float trans_rate=0.083333;// 1/12
+	float trans_rate=12;
 	u8 temp[64];
 	//捕获到一次脉冲,获取当前计数值，和溢出次数，然后清零重新开始计算下一下脉冲
 	cap=TIM_GetCounter(TIM2);
@@ -78,7 +78,7 @@ void EXTI9_5_IRQHandler(void)
 	Freq=1.0/total_ms*1000;//霍尔脉冲频率
 	speed=((Freq/8.0)*3.14*0.465*trans_rate);
 	memset(temp,' ',64);
-	sprintf(temp,"total_ms= %d  speed=%f m/s \n",total_ms,speed);
+	sprintf(temp,"total_ms= %d  speed=%f km/h \n",total_ms,speed*1000/3600);
 	uart1SendChars(temp,strlen(temp));
 	EXTI_ClearITPendingBit(EXTI_Line6);
 }

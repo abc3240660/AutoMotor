@@ -1,2 +1,3 @@
-/LIST
-*.txt
+project/LIST
+project/*.txt
+project/*.map
