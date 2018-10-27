@@ -31,6 +31,7 @@ int main(void)
 	OS_ENTER_CRITICAL();			//进入临界区(无法被中断打断)    
  	OSTaskCreate(LED0_Task,(void *)0,(OS_STK*)&LED0_TASK_STK[LED0_STK_SIZE-1],LED0_TASK_PRIO);						   
  	OSTaskCreate(LED1_Task,(void *)0,(OS_STK*)&LED1_TASK_STK[LED1_STK_SIZE-1],LED1_TASK_PRIO);	 				   
+	OSTaskCreate(SPEED_CAL_Task,(void *)0,(OS_STK*)&SPEED_TASK_STK[SPEED_STK_SIZE-1],SPEED_TASK_PRIO);	 				   
 	OS_EXIT_CRITICAL();				 //退出临界区(可以被中断打断)
 	
 	OSStart();	     //系统开始运行
