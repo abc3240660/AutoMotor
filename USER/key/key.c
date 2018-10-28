@@ -19,7 +19,7 @@ void KEY_Init(void)
 	
 	GPIO_InitTypeDef  GPIO_InitStructure;
 
-  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA|RCC_AHB1Periph_GPIOE, ENABLE);//使能GPIOA,GPIOE时钟
+  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA|RCC_AHB1Periph_GPIOF, ENABLE);//使能GPIOA,GPIOE时钟
  
   GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6;//|GPIO_Pin_3|GPIO_Pin_4; //KEY0 KEY1 KEY2对应引脚
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;//普通输入模式

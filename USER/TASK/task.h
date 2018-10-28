@@ -34,7 +34,7 @@ void LED1_Task(void *pdata);         //任务函数
 
 #define SPEED_TASK_PRIO       		4    //设置任务优先级
 
-#define SPEED_STK_SIZE  					64   //设置任务堆栈大小
+#define SPEED_STK_SIZE  					512   //设置任务堆栈大小
 
 extern OS_STK  SPEED_TASK_STK[SPEED_STK_SIZE];  //任务堆栈
 void SPEED_CAL_Task(void *pdata);
