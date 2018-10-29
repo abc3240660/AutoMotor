@@ -66,11 +66,11 @@ void EXTI9_5_IRQHandler(void)
 
 
 	//捕获到一次脉冲,获取当前计数值，和溢出次数，然后清零重新开始计算下一下脉冲
-	cap=TIM_GetCounter(TIM4);
+	cap=TIM_GetCounter(TIM2);
 	exp=exp_num;
 	
 	exp_num=0;
-	TIM_SetCounter(TIM4,0);
+	TIM_SetCounter(TIM2,0);
 	//计算速度
 	total_ms=cap/10 + 500*exp;//当前获取的计数值+溢出时间=脉冲周期
 

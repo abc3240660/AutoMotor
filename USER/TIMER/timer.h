@@ -4,6 +4,5 @@
 	
 
 void TIM2_Init(u16 auto_data,u16 fractional);
-void TIM4_Init(u16 auto_data,u16 fractional);
 	
 #endif
