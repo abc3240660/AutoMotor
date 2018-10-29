@@ -1,6 +1,9 @@
 #include "led.h"
 #include "includes.h"
 #include "task.h"
+#include "usart1.h"
+#include "usart5.h"
+#include "usart6.h"
 
 /*********************************************************************************
 *********************启明欣欣 STM32F407应用开发板(高配版)*************************
@@ -24,6 +27,16 @@ int main(void)
 	
 	delay_init();		  //初始化延时函数 利用滴答定时器SysTick中断模式延时，也提供了系统节拍
 	LED_Init();		    //初始化LED端口 
+	uart1_init(9600);
+
+#if 0
+	uart5_init(9600);
+	uart6_init(9600);
+	
+	printf("hello uart1\n");
+	uart5SendChars("usart5_test",11);
+	uart6SendChars("usart6_test",11);
+#endif
 	
 	OSInit();        //初始化UCOS系统
 	

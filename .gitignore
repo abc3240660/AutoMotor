@@ -1,3 +1,5 @@
 project/LIST
 project/*.txt
 project/*.map
+obj
+*.dbgconf

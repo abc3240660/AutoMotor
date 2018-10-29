@@ -1,16 +1,16 @@
-#ifndef __USART1_H
-#define __USART1_H
+#ifndef __USART5_H
+#define __USART5_H
 #include "stdio.h"	
 #include "common.h" 
 
 //////////////////////////////////////////////////////////////////////////////////	 
 
-#define USART1_REC_NUM  			100  	//定义最大接收字节数 200
+#define USART5_REC_NUM  			100  	//定义最大接收字节数 200
 extern u8 uart_byte_count;          //uart_byte_count要小于USART_REC_LEN
-extern u8 receive_str[USART1_REC_NUM];  
+extern u8 receive_str[USART5_REC_NUM];  
 
-void uart1_init(u32 bound);
-void uart1SendChars(u8 *str, u16 strlen);
+void uart5_init(u32 bound);
+void uart5SendChars(u8 *str, u16 strlen);
 
 #endif
 
