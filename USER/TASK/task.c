@@ -54,8 +54,8 @@ void SPEED_CAL_Task(void *pdata)
 	float trans_rate=12;
 	u8 temp[64];
 	uart1_init(9600);	    //串口初始化波特率为9600  
-	EXTIX_Init();			//外部中断初始化
-	TIM2_Init(4999,8399);	//定时器2时钟84M，分频系数8400，84M/8400=10K 所以计数5000次为500ms
+	//EXTIX_Init();			//外部中断初始化
+	TIM4_Init(4999,8399);	//定时器2时钟84M，分频系数8400，84M/8400=10K 所以计数5000次为500ms
 	uart1SendChars("Hello Word!",11);
 	//printf("Hello Word!",8);
 	while(1)
