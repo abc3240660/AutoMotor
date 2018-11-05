@@ -50,6 +50,7 @@ void _sys_exit(int x)
 { 
 	x = x; 
 } 
+
 //重定义fputc函数 
 int fputc(int ch, FILE *f)
 { 	

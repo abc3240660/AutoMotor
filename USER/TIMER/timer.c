@@ -58,17 +58,25 @@ void TIM2_IRQHandler(void)
 	}
 }
 extern int total_ms;
+int total_msTtemp=0;
+int capture1=0;
+int capture2=0;
 void TIM4_IRQHandler(void)
 {
 	if(TIM_GetITStatus(TIM4, TIM_IT_Update) != RESET)//timer溢出
 	{
 		exp_num++;
-		total_ms=exp_num*500;
+		total_msTtemp=exp_num*500;
 	}
 	if(TIM_GetITStatus(TIM4, TIM_IT_CC3) != RESET)//捕获1发生捕获事件
 	{
 		LED1=!LED1;//LED1翻转
-		total_ms += TIM_GetCapture3(TIM4)/10;
+		capture1= TIM_GetCapture3(TIM4)/10;
+		total_msTtemp+=capture1;
+		total_msTtemp-=capture2;
+		capture2 = capture1;
+		total_ms=total_msTtemp;
+		total_msTtemp=0;
 		exp_num=0;
 	}
 	TIM_ClearITPendingBit(TIM4, TIM_IT_CC3|TIM_IT_Update); //清除中断标志位

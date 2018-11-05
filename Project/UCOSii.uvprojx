@@ -175,7 +175,7 @@
           </Flash1>
           <bUseTDR>1</bUseTDR>
           <Flash2>BIN\UL2CM3.DLL</Flash2>
-          <Flash3></Flash3>
+          <Flash3>"" ()</Flash3>
           <Flash4></Flash4>
           <pFcarmOut></pFcarmOut>
           <pFcarmGrp></pFcarmGrp>
@@ -365,7 +365,7 @@
               <MiscControls></MiscControls>
               <Define>STM32F40_41xxx,USE_STDPERIPH_DRIVER</Define>
               <Undefine></Undefine>
-              <IncludePath>..\Common;..\Main;..\Startup_config;..\STM32F4_FWLIB\inc;..\USER\LED;..\UCOSII\Source;..\UCOSII\Port;..\USER\TASK;..\USER\usart;..\USER\key;..\USER\extint;..\USER\TIMER</IncludePath>
+              <IncludePath>..\Common;..\Main;..\Startup_config;..\STM32F4_FWLIB\inc;..\USER\LED;..\UCOSII\Source;..\UCOSII\Port;..\USER\TASK;..\USER\usart;..\USER\key;..\USER\extint;..\USER\TIMER;..\USER\usart1;..\USER\usart5;..\USER\usart6</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -454,11 +454,6 @@
               <FilePath>..\USER\TIMER\timer.c</FilePath>
             </File>
             <File>
-              <FileName>usart.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\USER\usart\usart.c</FilePath>
-            </File>
-            <File>
               <FileName>exti.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\USER\extint\exti.c</FilePath>
@@ -467,6 +462,11 @@
               <FileName>key.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\USER\key\key.c</FilePath>
+            </File>
+            <File>
+              <FileName>usart1.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\USER\usart1\usart1.c</FilePath>
             </File>
           </Files>
         </Group>

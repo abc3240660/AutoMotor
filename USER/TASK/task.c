@@ -39,9 +39,11 @@ void LED1_Task(void *pdata)
 	while(1)
 	{
 		//LED1=0;
-		OSTimeDlyHMSM(0,0,0,300);
+		PA15=0;
+		OSTimeDlyHMSM(0,0,0,5);
 		//LED1=1;
-		OSTimeDlyHMSM(0,0,0,600);
+		PA15=1;
+		OSTimeDlyHMSM(0,0,0,5);
 	};
 }
 //测速task
@@ -52,18 +54,20 @@ void SPEED_CAL_Task(void *pdata)
 	float speed=0;
 	float Freq=0;
 	float trans_rate=12;
-	u8 temp[64];
+	char temp[128];
 	uart1_init(9600);	    //串口初始化波特率为9600  
 	//EXTIX_Init();			//外部中断初始化
 	TIM4_Init(4999,8399);	//定时器2时钟84M，分频系数8400，84M/8400=10K 所以计数5000次为500ms
 	printf("Hello Word!\n");
 	while(1)
 	{
-		OSTimeDlyHMSM(0,0,0,1000);
+		OSTimeDlyHMSM(0,0,0,100);
 		Freq=1.0/total_ms*1000;//霍尔脉冲频率
 		speed=((Freq/8.0)*3.14*0.465*trans_rate);
-		memset(temp,' ',64);
-		printf("total_ms= %d speed=%f km/h\n",total_ms,speed*1000/3600);
+		memset(temp,0x00,128);
+		
+		sprintf(temp,"total_ms= %d speed=%d km/h\n",total_ms,(int)(speed*1000/3600));
+		printf("%s",temp);
 	};
 }
 
