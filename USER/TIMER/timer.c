@@ -24,39 +24,50 @@
 ****************************************************************************/
 void TIM2_Init(u16 auto_data,u16 fractional)
 {
-	TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStructure;
-	NVIC_InitTypeDef NVIC_InitStructure;
+        GPIO_InitTypeDef GPIO_InitStructure;
+        TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStructure;
+        TIM_ICInitTypeDef TIM_ICInitStructure;
+        
+        RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA,ENABLE);        //GPIOA????
+        RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2,ENABLE);                //TIM2????
+        
+        GPIO_InitStructure.GPIO_Mode=GPIO_Mode_AF;        //????
+        GPIO_InitStructure.GPIO_OType=GPIO_OType_PP;        //
+        GPIO_InitStructure.GPIO_Pin=GPIO_Pin_5;
+        GPIO_InitStructure.GPIO_PuPd=GPIO_PuPd_UP;        //
+        GPIO_InitStructure.GPIO_Speed=GPIO_Speed_100MHz;
+        GPIO_Init(GPIOA,&GPIO_InitStructure);                //???GPIOA_0
+        GPIO_PinAFConfig(GPIOA,GPIO_PinSource5,GPIO_AF_TIM2);
 	
-	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2,ENABLE);      //使能TIM2时钟
-	
-  TIM_TimeBaseInitStructure.TIM_Period = auto_data; 	     //自动重装载值
-	TIM_TimeBaseInitStructure.TIM_Prescaler=fractional;      //定时器分频
-	TIM_TimeBaseInitStructure.TIM_CounterMode=TIM_CounterMode_Up; //向上计数模式
-	TIM_TimeBaseInitStructure.TIM_ClockDivision=TIM_CKD_DIV1; 
-	
-	TIM_TimeBaseInit(TIM2,&TIM_TimeBaseInitStructure);//初始化TIM2
-	
-	TIM_ITConfig(TIM2,TIM_IT_Update,ENABLE); //允许定时器2更新中断
-	TIM_Cmd(TIM2,ENABLE);                    //使能定时器2
-	
-	NVIC_InitStructure.NVIC_IRQChannel=TIM2_IRQn; //定时器2中断
-	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority=0x01; //抢占优先级1
-	NVIC_InitStructure.NVIC_IRQChannelSubPriority=0x03;  //子优先级3
-	NVIC_InitStructure.NVIC_IRQChannelCmd=ENABLE;
-	NVIC_Init(&NVIC_InitStructure);
+        TIM_TimeBaseInitStructure.TIM_ClockDivision=TIM_CKD_DIV1;
+        TIM_TimeBaseInitStructure.TIM_CounterMode=TIM_CounterMode_Up;
+        TIM_TimeBaseInitStructure.TIM_Period=0xFFFFFFFF;
+        TIM_TimeBaseInitStructure.TIM_Prescaler=0x00;
+        TIM_TimeBaseInitStructure.TIM_RepetitionCounter=0;
+        TIM_TimeBaseInit(TIM2,&TIM_TimeBaseInitStructure); //?????????        
+        
+        TIM_ITRxExternalClockConfig(TIM2,TIM_TS_ETRF);        //??????ETRF
+        TIM_ETRClockMode2Config(TIM2,TIM_ExtTRGPSC_OFF,TIM_ExtTRGPolarity_NonInverted,7);        //???,???
+        
+        TIM_SetCounter(TIM2,0);
+        TIM_Cmd(TIM2,ENABLE);
 }
 
 //定时器2中断服务函数
-int exp_num=0;
+int pluse_num=0;
+int pluse_num_old=0;
+int pluse_num_new=0;
 void TIM2_IRQHandler(void)
 {
-	if(TIM_GetITStatus(TIM2,TIM_IT_Update)==SET) //溢出中断
+	if(TIM_GetITStatus(TIM3,TIM_IT_Update)==SET) //溢出中断
 	{
-		exp_num++;
-		LED1=!LED1;//LED1翻转
-  	TIM_ClearITPendingBit(TIM2,TIM_IT_Update);  //清除中断标志位
+
+		LED0=!LED0;//LED1翻转
+  	
 	}
+	TIM_ClearITPendingBit(TIM3,TIM_IT_CC3|TIM_IT_Update);  //清除中断标志位
 }
+int exp_num=0;
 extern int total_ms;
 int total_msTtemp=0;
 int capture1=0;
@@ -66,7 +77,10 @@ void TIM4_IRQHandler(void)
 	if(TIM_GetITStatus(TIM4, TIM_IT_Update) != RESET)//timer溢出
 	{
 		exp_num++;
-		total_msTtemp=exp_num*500;
+		total_msTtemp=exp_num*1000;
+		pluse_num_new = TIM_GetCounter(TIM2);//每1s中读取脉冲数
+		pluse_num =pluse_num_new - pluse_num_old;
+		pluse_num_old = pluse_num_new;
 	}
 	if(TIM_GetITStatus(TIM4, TIM_IT_CC3) != RESET)//捕获1发生捕获事件
 	{
@@ -82,10 +96,10 @@ void TIM4_IRQHandler(void)
 	TIM_ClearITPendingBit(TIM4, TIM_IT_CC3|TIM_IT_Update); //清除中断标志位
 }
 
-TIM_ICInitTypeDef  TIM4_ICInitStructure;
+
 void TIM4_Init(u16 auto_data,u16 fractional)
 {
-
+	TIM_ICInitTypeDef  TIM4_ICInitStructure;
 	GPIO_InitTypeDef GPIO_InitStructure;
 	TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
 	NVIC_InitTypeDef NVIC_InitStructure;
