@@ -24,7 +24,7 @@ static u16 cpr74_crc16_calc(u8* dat, u8 len)
 		}
 	}
 
-	printf("crc16 = 0x%.4X\n", crc);
+	//printf("crc16 = 0x%.4X\n", crc);
 
 	return crc;
 }
@@ -77,9 +77,24 @@ static void cpr74_parse_ack(u8 bit_pos, u8 bit_len)
 			break;
 		}
 	}
+	
+	printf("RFID GET DATA: %s\n", pGotVal);
 }
 
-static RET_RFID cpr74_check_ack(void)
+static void cpr74_error_msg(RET_RFID ret)
+{
+	if (RET_RFID_RECV_DAT_VALID == ret) {
+		printf("CPR74 ERR: Header is not 02\n");
+	} else if (RET_RFID_RECV_LEN_VALID == ret) {
+		if (0x08 == cpr74_recv_size) {
+			printf("CPR74 WAR: No Card Detected\n");
+		} else {
+			printf("CPR74 ERR: Non Supported Card Detected\n");
+		}
+	}
+}
+
+static RET_RFID cpr74_check_ack(u8 expect_len)
 {
 	u8 data_len = 0;
 	RET_RFID ret = RET_RFID_OK;
@@ -93,29 +108,37 @@ static RET_RFID cpr74_check_ack(void)
 			if (data_len != (UART5_RX_STA&0X7FFF)) {// Length Check
 				ret = RET_RFID_RECV_LEN_VALID;
 			}
+			if (data_len != expect_len) {// Length Check
+				ret = RET_RFID_RECV_LEN_VALID;
+			}
+			
+			cpr74_recv_size = data_len;
 		}
 	} 
 
 	return ret;
 }
 
-static RET_RFID cpr74_send_cmd(u8 *cmd, u8 len, u16 waittime)
+static RET_RFID cpr74_send_cmd(u8 *cmd, u8 len, u8 expect_len, u16 waittime)
 {
 	u8 i = 0;
 	RET_RFID ret = RET_RFID_OK;
 
 	UART5_RX_STA = 0;
 
+	//printf("RFID SEND:");
 	for (i=0; i<len; i++) {
 		while((UART5->SR&0X40) == 0);
 		UART5->DR = cmd[i];
+		//printf("%.2X ", cmd[i]);
 	}
+	//printf("\n");
 
 	if (waittime) {
 		while (--waittime) {
 			delay_ms(10);
 			if (UART5_RX_STA&0X8000) {// ACK RECVED
-				ret = cpr74_check_ack();
+				ret = cpr74_check_ack(expect_len);
 				break;
 			} 
 		}
@@ -137,14 +160,14 @@ static RET_RFID cpr74_inventory()
 	cpr74_send_buf[0] = 0x02;
 	cpr74_send_buf[1] = 0x00;
 	cpr74_send_buf[2] = 0x09;
-	cpr74_send_buf[3] = 0xFF;
+	cpr74_send_buf[3] = 0x00;
 	cpr74_send_buf[4] = 0xB0;
 	cpr74_send_buf[5] = 0x01;
 	cpr74_send_buf[6] = 0x00;
-	cpr74_send_buf[7] = 0x18;
-	cpr74_send_buf[8] = 0x43;
+	cpr74_send_buf[7] = 0xCA;
+	cpr74_send_buf[8] = 0x86;
 
-	ret = cpr74_send_cmd(cpr74_send_buf, 0x09, 1000);
+	ret = cpr74_send_cmd(cpr74_send_buf, 0x09, 0x13, 100);
 	if (ret != RET_RFID_OK) {
 		return ret;
 	}
@@ -174,8 +197,9 @@ static RET_RFID cpr74_select_stage1()
 	cpr74_send_buf[6] = 0x21;
 
 	// serial number
-	for (i=0; i<SERIAL_NUM_SIZE; i++) {
-		cpr74_send_buf[7+i]  = calypso_serial_num[i];
+	for (i=0; i<SERIAL_NUM_SIZE/2; i++) {
+		cpr74_send_buf[7+i]  = cpr74_chr2hex(calypso_serial_num[2*i])<<4;
+		cpr74_send_buf[7+i] += cpr74_chr2hex(calypso_serial_num[2*i+1]);
 	}
 
 	crc16 = cpr74_crc16_calc(cpr74_send_buf, cpr74_send_buf[2]-2);
@@ -183,7 +207,7 @@ static RET_RFID cpr74_select_stage1()
 	cpr74_send_buf[15] = (u8)crc16;
 	cpr74_send_buf[16] = (u8)(crc16>>8);
 
-	ret = cpr74_send_cmd(cpr74_send_buf, 0x11, 1000);
+	ret = cpr74_send_cmd(cpr74_send_buf, 0x11, 0x0D, 100);
 	if (ret != RET_RFID_OK) {
 		return ret;
 	}
@@ -206,7 +230,7 @@ static RET_RFID cpr74_select_stage2()
 	cpr74_send_buf[6] = 0x73;
 	cpr74_send_buf[7] = 0x50;
 
-	ret = cpr74_send_cmd(cpr74_send_buf, 0x08, 1000);
+	ret = cpr74_send_cmd(cpr74_send_buf, 0x08, 0x18, 100);
 	if (ret != RET_RFID_OK) {
 		return ret;
 	}
@@ -235,7 +259,7 @@ static RET_RFID cpr74_apdu_stage1()
 	cpr74_send_buf[12] = 0x01;
 	cpr74_send_buf[13] = 0x1D;
 
-	ret = cpr74_send_cmd(cpr74_send_buf, 0x0E, 1000);
+	ret = cpr74_send_cmd(cpr74_send_buf, 0x0E, 0x2A, 100);
 	if (ret != RET_RFID_OK) {
 		return ret;
 	}
@@ -254,11 +278,13 @@ RET_RFID cpr74_read_calypso(void)
 
 	ret = cpr74_inventory();
 	if (ret != RET_RFID_OK) {
+		cpr74_error_msg(ret);
 		return ret;
 	}
-#if 0
+#if 1
 	ret = cpr74_select_stage1();
 	if (ret != RET_RFID_OK) {
+		cpr74_error_msg(ret);
 		return ret;
 	}
 #if 0
@@ -268,6 +294,9 @@ RET_RFID cpr74_read_calypso(void)
 	}
 #endif
 	ret = cpr74_apdu_stage1();
+	if (ret != RET_RFID_OK) {
+		cpr74_error_msg(ret);
+	}
 #endif
 	return ret;
 }

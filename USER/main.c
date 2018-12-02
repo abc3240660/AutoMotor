@@ -6,6 +6,7 @@
 #include "sim900a.h"
 #include "can1.h"
 #include "can2.h"
+#include "rfid.h"
 
 /////////////////////////UCOSII任务设置///////////////////////////////////
 //START 任务
@@ -52,6 +53,9 @@ void watch_task(void *pdata);
 //系统初始化
 void system_init(void)
 {
+	u8 res;
+	u16 temp=0;
+	u32 dtsize,dfsize;
 	u8 CAN1_mode=0; //CAN工作模式;0,普通模式;1,环回模式
 	u8 CAN2_mode=0; //CAN工作模式;0,普通模式;1,环回模式	
 	
@@ -63,15 +67,31 @@ void system_init(void)
 // 	KEY_Init();					//按键初始化 
 //	W25QXX_Init();				//初始化W25Q128
 
+	printf("SmartMotor Starting...\n");
 	CAN1_Mode_Init(CAN1_mode);//CAN初始化普通模式,波特率250Kbps
 	CAN2_Mode_Init(CAN2_mode);//CAN初始化普通模式,波特率500Kbps 
   
 	my_mem_init(SRAMIN);		//初始化内部内存池
 	my_mem_init(SRAMCCM);		//初始化CCM内存池 
-	
-//	exfuns_init();				//FATFS 申请内存
 
 	delay_ms(1500);
+	
+ 	exfuns_init();// alloc for fats
+	// Call SD_Init internally
+  f_mount(fs[0],"0:",1);
+	
+	temp=0;	
+ 	do {
+		temp++;
+ 		res=exf_getfree("0:",&dtsize,&dfsize);
+		delay_ms(200);		   
+	} while(res&&temp<5);
+	
+ 	if(res==0) {
+		printf("Read SD OK!\r\n");
+	} else {
+		printf("Read SD Failed!\r\n");
+	}
 }   
 
 //main函数	  					
@@ -108,21 +128,19 @@ void main_task(void *pdata)
 //		sim900a_send_cmd("AT","OK",100);
 //		delay_ms(1000);
 //	}
-//	sim7500e_tcp_connect(0,NULL,NULL);
-	delay_ms(5000);
-	cpr74_read_calypso();
+	sim7500e_tcp_connect(0,NULL,NULL);
+//	delay_ms(5000);
+//	cpr74_read_calypso();
 }
 
 //执行最不需要时效性的代码
 void usart_task(void *pdata)
-{	    
-	while(1)
-	{			  
-		if (0x08 == sim7500dev.status&0x08) {
-			LED0=!LED0;
-		}
-//		printf("USART3_RX_STA_BAK = %d\n", USART3_RX_STA_BAK);
-		delay_ms(1000);	 
+{	 
+	delay_ms(2000);
+	
+	while(1) {
+		delay_ms(3000);
+		cpr74_read_calypso();
 	}
 }
 

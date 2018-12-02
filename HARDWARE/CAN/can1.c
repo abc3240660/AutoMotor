@@ -187,3 +187,21 @@ u8 CAN1_RingAlarm(void)
 	
 	return 0;
 }
+
+u8 CAN1_StartAll(void)
+{
+	u8 can1_sendbuf[8]={0x3F, 0x05, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00};
+	
+	CAN1_Send_Msg(can1_sendbuf,8);//发送8个字节 
+	
+	return 0;
+}
+
+u8 CAN1_StartHint(void)
+{
+	u8 can1_sendbuf[8]={0x0C, 0x05, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00};
+	
+	CAN1_Send_Msg(can1_sendbuf,8);//发送8个字节 
+	
+	return 0;
+}

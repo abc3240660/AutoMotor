@@ -8,6 +8,7 @@
 #include "ff.h" 
 #include "ucos_ii.h" 
 #include "can1.h"
+#include "rfid.h"
 
 __sim7500dev sim7500dev;	//sim7500控制器
 
@@ -16,10 +17,27 @@ const char* cmd_list[] = {
 	CMD_HEART_BEAT,
 	CMD_INQUIRE_PARAM,
 	CMD_RING_ALARM,
-	CMD_DOOR_OPEN,
-	CMD_DOOR_CLOSE,
+	CMD_OPEN_DOOR,
+	CMD_DOOR_CLOSED,
 	CMD_JUMP_LAMP,
+	CMD_CALYPSO_UPLOAD,
+	CMD_ENGINE_START,
+	CMD_CLOSE_DOOR,
 	NULL
+};
+
+const char* ext_ack_list[] = {
+	"+NETCLOSE:",
+	"+NETOPEN: 0",
+	"+CIPOPEN: 0,0",
+	NULL
+};
+
+enum ACK_MSG_TYPE {
+	NET_CLOSE_OK = 0,
+	NET_OPEN_OK,
+	TCP_CON_OK,
+	UNKNOWN_ACK
 };
 
 char send_buf[LEN_MAX_SEND] = "";
@@ -27,6 +45,9 @@ char recv_buf[LEN_MAX_RECV] = "";
 
 char sync_sys_time[LEN_SYS_TIME+1] = "";
 
+u8 tcp_net_ok = 0;
+
+int power_state = 0;
 int door_state = 0;
 int ring_times = 0;
 int lamp_times = 0;
@@ -121,22 +142,57 @@ void sim7500e_cmd_over(void)
 	sim7500dev.cmdon=0;//退出指令等待状态
 }
 
-static void sim7500e_long_return_check(void)
+static u8 sim7500e_long_return_check(enum ACK_MSG_TYPE ack_type)
 {
 	char* str = 0;
+	
+	if (0 == USART3_RX_STA_BAK) {
+		return 2;
+	}
+	
+	delay_ms(200);// to make sure that all data is recved
+	
 	USART3_RX_BUF_BAK[USART3_RX_STA_BAK&0X7FFF]=0;//添加结束符
-	USART3_RX_STA_BAK = 0;
 	printf("bak recved %s\n", USART3_RX_BUF_BAK);
 	
-	// +CIPOPEN: 0,0
-	str = strstr((char*)USART3_RX_BUF_BAK, "+CIPOPEN");
-	if (str) {
-		if (('0' == *(str+10)) && ('0' == *(str+12))) {
-			sim7500dev.status |= 0x08;
-		} else {
-			sim7500dev.status &= 0xF7;
+	if (NET_CLOSE_OK == ack_type) {
+		// +NETCLOSE: 0
+		str = strstr((char*)USART3_RX_BUF_BAK, "+NETCLOSE");
+		if (str) {
+			if ('0' == *(str+11)) {
+				return 0;
+			} else {
+				return 1;
+			}
+		}
+	} else if (NET_OPEN_OK == ack_type) {
+		// +NETOPEN: 0
+		str = strstr((char*)USART3_RX_BUF_BAK, "+NETOPEN");
+		if (str) {
+			if ('0' == *(str+10)) {
+				return 0;
+			} else {
+				return 1;
+			}
+		}
+	} else if (TCP_CON_OK == ack_type) {
+		// +CIPOPEN: 0,0
+		str = strstr((char*)USART3_RX_BUF_BAK, "+CIPOPEN");
+		if (str) {
+			if (('0' == *(str+10)) && ('0' == *(str+12))) {
+				sim7500dev.status |= 0x08;
+				return 0;
+			} else {
+				sim7500dev.status &= 0xF7;
+				return 1;
+			}
 		}
 	}
+
+	USART3_RX_STA_BAK = 0;
+	memset(USART3_RX_BUF_BAK, 0, USART3_MAX_RECV_LEN);
+	
+	return 0;
 }
 
 void sim7500e_tcp_send(char* send)
@@ -151,12 +207,38 @@ void sim7500e_tcp_send(char* send)
 }
 
 // DEV ACK
-void sim7500e_do_door_open(char* send)
+void sim7500e_do_engine_start(char* send)
+{
+	CAN1_StartEngine();
+
+	memset(send, 0, LEN_MAX_SEND);
+	sprintf(send, "%s,%s,%s,%s,%s,%d$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_ENGINE_START, power_state);
+
+	printf("SEND:%s\n", send);
+	
+	sim7500e_tcp_send(send);
+}
+
+// DEV ACK
+void sim7500e_do_open_door(char* send)
 {
 	CAN1_OpenDoor();
 
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s,%s,%d\n", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_DOOR_OPEN, door_state);
+	sprintf(send, "%s,%s,%s,%s,%s,%d$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_OPEN_DOOR, door_state);
+
+	printf("SEND:%s\n", send);
+	
+	sim7500e_tcp_send(send);
+}
+
+// DEV ACK
+void sim7500e_do_close_door(char* send)
+{
+	CAN1_CloseDoor();
+
+	memset(send, 0, LEN_MAX_SEND);
+	sprintf(send, "%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DOOR_CLOSED);
 
 	printf("SEND:%s\n", send);
 	
@@ -169,7 +251,7 @@ void sim7500e_do_jump_lamp(char* send)
 	CAN1_JumpLamp();
 
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s,%s\n", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_JUMP_LAMP);
+	sprintf(send, "%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_JUMP_LAMP);
 
 	printf("SEND:%s\n", send);
 	
@@ -182,7 +264,7 @@ void sim7500e_do_ring_alarm(char* send)
 	CAN1_RingAlarm();
 
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s,%s\n", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_RING_ALARM);
+	sprintf(send, "%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_RING_ALARM);
 
 	printf("SEND:%s\n", send);
 	
@@ -193,7 +275,7 @@ void sim7500e_do_ring_alarm(char* send)
 u8 sim7500e_do_dev_register(char* send)
 {
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s,%s,%s,%s\n", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_REGISTER, HW_VERSION, SW_VERSION, bat_vol);
+	sprintf(send, "%s,%s,%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_REGISTER, HW_VERSION, SW_VERSION, bat_vol);
 
 	printf("SEND:%s\n", send);
 	
@@ -206,7 +288,7 @@ u8 sim7500e_do_dev_register(char* send)
 void sim7500e_do_heart_beat(char* send)
 {
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s,%s,%d,%s,%s\n", PROTOCOL_HEAD, DEV_TAG, imei, CMD_HEART_BEAT, dev_time, lock_state, rssi, bat_vol);
+	sprintf(send, "%s,%s,%s,%s,%s,%d,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_HEART_BEAT, dev_time, lock_state, rssi, bat_vol);
 	
 	printf("SEND:%s\n", send);
 	
@@ -214,12 +296,21 @@ void sim7500e_do_heart_beat(char* send)
 }
 
 // DEV Auto SEND
-void sim7500e_do_door_close(char* send)
+void sim7500e_do_door_closed(char* send)
 {
-	CAN1_CloseDoor();
-
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s\n", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DOOR_CLOSE);
+	sprintf(send, "%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DOOR_CLOSED);
+
+	printf("SEND:%s\n", send);
+	
+	sim7500e_tcp_send(send);
+}
+
+// DEV Auto SEND
+void sim7500e_do_calypso_upload(char* send)
+{
+	memset(send, 0, LEN_MAX_SEND);
+	sprintf(send, "%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_CALYPSO_UPLOAD, calypso_card_id);
 
 	printf("SEND:%s\n", send);
 	
@@ -255,10 +346,15 @@ void sim7500e_parse_msg(char* msg, char* send)
 				if (cmd_type != UNKNOWN_CMD) {
 					if (0 == data_pos) {
 						data_pos = index;
+						printf("data_pos = %d, cmd_type = %d\n", data_pos, cmd_type);
 					}
 					
-					if (DOOR_OPEN == cmd_type) {
-						sim7500e_do_door_open(send);
+					if (OPEN_DOOR == cmd_type) {
+						sim7500e_do_open_door(send);
+					} else if (ENGINE_START == cmd_type) {
+						sim7500e_do_engine_start(send);
+					} else if (CLOSE_DOOR == cmd_type) {
+						sim7500e_do_close_door(send);
 					}
 				} else {
 					// TBD
@@ -315,28 +411,132 @@ void sim7500e_tcp_connect(u8 mode,u8* ipaddr,u8* port)
 		delay_ms(50);
 	}
 	
-#if 1
 	if(sim7500e_send_cmd("ATE0","OK",200)) {
-		if(sim7500e_send_cmd("ATE0","OK",200))return;//不回显
+		if(sim7500e_send_cmd("ATE0","OK",200))return;// 关闭回显
 	}
-#endif
-
-	sim7500e_send_cmd("AT+NETCLOSE","OK",200);
-	sim7500e_send_cmd("AT+NETCLOSE","OK",200);
 	
-	delay_ms(1000);
+	printf("Start NETCLOSE...\n");
 	
-	if(sim7500e_send_cmd("AT+NETOPEN","OK",200)) {
-		if(sim7500e_send_cmd("AT+NETOPEN","OK",200))return;
+	CAN1_JumpLamp();
+NETCLOSE:
+	if (sim7500e_send_cmd("AT+NETCLOSE","+NETCLOSE:",1000)) {
+		u8 loop_cnt = 0;
+		u8 retval = 0;
+		while(1) {
+			retval = sim7500e_long_return_check(NET_CLOSE_OK);
+			
+			if (0 == retval) {// Ext Data ErrCode is correct
+				printf("Ext Data ErrCode is correct\n");
+				break;
+			} else if (1 == retval) {// Ext Data ErrCode is error
+				loop_cnt++;
+				printf("Ext Data ErrCode is error\n");
+				delay_ms(1000);
+				
+				if (50 == loop_cnt) {
+					break;
+				}
+				
+				goto NETCLOSE;
+			} else if (2 == retval) {// No Ext Data Recved
+				loop_cnt++;
+				printf("No Ext Data Recved\n");
+				delay_ms(1000);
+				//sim7500e_send_cmd("AT","OK",100);
+				if (0 == sim7500e_send_cmd("AT+NETCLOSE","+NETCLOSE:",1000)) {
+					break;
+				}
+					
+				if (50 == loop_cnt) {
+					break;
+				}
+			}
+		}
 	}
+	
 	delay_ms(100);
-	if(sim7500e_send_cmd("AT+CIPOPEN=0,\"TCP\",\"122.4.233.119\",9001","OK",500))return;//发起连接
-	//sim7500e_cmd_over();
+
+	LED1 = 1;
+	LED2 = 1;
 	
-	delay_ms(500);
+	printf("Start NETOPEN...\n");
 	
-	sim7500e_long_return_check();
+NETOPEN:
+	if(sim7500e_send_cmd("AT+NETOPEN","+NETOPEN: 0",1000)) {// "OK" Recved
+		u8 loop_cnt = 0;
+		u8 retval = 0;
+		while(1) {
+			retval = sim7500e_long_return_check(NET_OPEN_OK);
+			
+			if (0 == retval) {// Ext Data ErrCode is correct
+				printf("Ext Data ErrCode is correct\n");
+				break;
+			} else if (1 == retval) {// Ext Data ErrCode is error
+				loop_cnt++;
+				printf("Ext Data ErrCode is error\n");
+				delay_ms(1000);
+				
+				if (50 == loop_cnt) {
+					break;
+				}
+				
+				goto NETOPEN;
+			} else if (2 == retval) {// No Ext Data Recved
+				loop_cnt++;
+				printf("No Ext Data Recved\n");
+				delay_ms(1000);
+				
+				//sim7500e_send_cmd("AT","OK",100);
+				if (0 == sim7500e_send_cmd("AT+NETOPEN","+NETOPEN: 0",1000)) {
+					break;
+				}
+				if (50 == loop_cnt) {
+					break;
+				}
+			}
+		}
+	}
 	
+	LED1 = 1;
+	LED2 = 1;
+	
+	delay_ms(100);
+	
+	printf("Start CIPOPEN...\n");
+
+CIPOPEN:
+	if(sim7500e_send_cmd("AT+CIPOPEN=0,\"TCP\",\"122.4.233.119\",9001","+CIPOPEN: 0,0",1000)) {
+		u8 loop_cnt = 0;
+		u8 retval = 0;
+		while(1) {
+			retval = sim7500e_long_return_check(TCP_CON_OK);
+			
+			if (0 == retval) {// Ext Data ErrCode is correct
+				printf("Ext Data ErrCode is correct\n");
+				break;
+			} else if (1 == retval) {// Ext Data ErrCode is error
+				loop_cnt++;
+				printf("Ext Data ErrCode is error\n");
+				delay_ms(1000);
+				
+				if (50 == loop_cnt) {
+					return;
+				}
+				
+				goto CIPOPEN;
+			} else if (2 == retval) {// No Ext Data Recved
+				loop_cnt++;
+				printf("No Ext Data Recved\n");
+				delay_ms(1000);
+				
+				sim7500e_send_cmd("AT","OK",100);
+				if (50 == loop_cnt) {
+					return;
+				}
+			}
+		}
+	}
+				
 	delay_ms(100);
 	if(sim7500e_send_cmd("AT+CIPSEND=0,5",">",200))return;
 	delay_ms(100);
@@ -383,7 +583,6 @@ void sim7500e_tcp_connect(u8 mode,u8* ipaddr,u8* port)
 		delay_ms(10);
 		if(USART3_RX_STA&0X8000)		//接收到一次数据了
 		{
-			u8 lenth_cnt = 0;
 			u8 data_lenth = 0;
 			USART3_RX_BUF[USART3_RX_STA&0X7FFF]=0;	//添加结束符 
 			//printf("RECVED %s",USART3_RX_BUF);				//发送到串口  
@@ -408,21 +607,36 @@ void sim7500e_tcp_connect(u8 mode,u8* ipaddr,u8* port)
 					num_cnt++;
 				}
 				
+				printf("num_cnt = %d\n", num_cnt);
+				
 				data_lenth = 0;
 				for (i=0; i<num_cnt; i++) {
+					if (i != 0) {
+						data_lenth *= 10;
+					}
 					data_lenth += *(p2+4+i) - '0';
+					printf("data_lenth = %d\n", data_lenth);
 				}
 				
 				memset(recv_buf, 0, LEN_MAX_RECV);
-				memcpy(recv_buf, p2+4+2+lenth_cnt, LEN_MAX_RECV);
+				memcpy(recv_buf, p2+4+num_cnt, LEN_MAX_RECV);
+				
+				if (data_lenth < LEN_MAX_RECV) {
+					recv_buf[data_lenth] = '\0';// $ -> 0
+				}
 				
 				USART3_RX_STA=0;// Let Interrupt Go On Saving DATA
 				
-				printf("RECVED MSG: %s\n", recv_buf);
+				printf("RECVED MSG(%dB): %s\n", data_lenth, recv_buf);
 				
 				sim7500e_parse_msg(recv_buf, send_buf);
 			}
 			USART3_RX_STA=0;
+		} else {
+			if (calypso_card_id[0] != 0) {
+				sim7500e_do_calypso_upload(send_buf);
+				calypso_card_id[0] = 0;
+			}
 		}
 		if(oldsta!=connectsta)
 		{

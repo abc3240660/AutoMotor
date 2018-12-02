@@ -221,11 +221,11 @@ void TIM6_DAC_IRQHandler(void)
 	{ 
 		UART5_RX_STA|=1<<15;
 		UART5_RX_BUF[UART5_RX_STA&0X7FFF]=0;
-		printf("RFID RECVED:");
-		for (i=0; i<(UART5_RX_STA&0X7FFF); i++) {
-			printf("%.2X ", UART5_RX_BUF[i]);
-		}
-		printf("\n");
+		//printf("RFID RECVED:");
+		//for (i=0; i<(UART5_RX_STA&0X7FFF); i++) {
+		//	printf("%.2X ", UART5_RX_BUF[i]);
+		//}
+		//printf("\n");
 		TIM_ClearITPendingBit(TIM6,TIM_IT_Update);
    
 		TIM_Cmd(TIM6,DISABLE);
