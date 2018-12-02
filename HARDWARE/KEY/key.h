@@ -15,15 +15,17 @@
 ////////////////////////////////////////////////////////////////////////////////// 	 
 
 
-#define KEY0 		PEin(4)   	//PE4
-#define KEY1 		PEin(3)		//PE3 
+#define KEY0 		PFin(9)   
+#define KEY1 		PFin(8)		
+#define KEY2 		PFin(7)		
+#define WK_UP		PFin(6)		
 
-#define WK_UP 		PAin(0)		//PA0
-#define XFS_RDY 	PAin(7)		//PA7
-
-#define KEY0_PRES 	1	//KEY0按下
-#define KEY1_PRES		2	//KEY1按下
+#define KEY0_PRES 	1
+#define KEY1_PRES		2
+#define KEY2_PRES		3
+#define WKUP_PRES   4
 
 void KEY_Init(void);	//IO初始化
-u8 KEY_Scan(u8);  		//按键扫描函数					    
+u8 KEY_Scan(u8);  		//按键扫描函数
+					    
 #endif

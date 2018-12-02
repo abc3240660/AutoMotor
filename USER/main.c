@@ -50,6 +50,10 @@ __align(8) static OS_STK WATCH_TASK_STK[WATCH_STK_SIZE];
 void watch_task(void *pdata);
 //////////////////////////////////////////////////////////////////////////////	 
 
+int total_ms=0;
+extern int pluse_num_new;
+//////////////////////////////////////////////////////////////////////////////	 
+
 //系统初始化
 void system_init(void)
 {
@@ -64,7 +68,7 @@ void system_init(void)
 	usart3_init(115200);		//初始化串口3波特率为115200
 	usart5_init(38400);
  	LED_Init();					//初始化LED 
-// 	KEY_Init();					//按键初始化 
+ 	KEY_Init();					//按键初始化 
 //	W25QXX_Init();				//初始化W25Q128
 
 	printf("SmartMotor Starting...\n");
@@ -74,6 +78,9 @@ void system_init(void)
 	my_mem_init(SRAMIN);		//初始化内部内存池
 	my_mem_init(SRAMCCM);		//初始化CCM内存池 
 
+	TIM2_Init(9999,8399);	
+	TIM4_Init(9999,8399);
+	
 	delay_ms(1500);
 	
  	exfuns_init();// alloc for fats
@@ -141,16 +148,44 @@ void usart_task(void *pdata)
 	while(1) {
 		delay_ms(3000);
 		cpr74_read_calypso();
+		
+		printf("Hall Counter = %d\n", pluse_num_new);
 	}
 }
 
 //监视任务
 void watch_task(void *pdata)
 {
+	u8 key;
   OS_CPU_SR cpu_sr=0; 
 	
-	while(1) {
-		delay_ms(100);
+	while(1)
+	{
+		// TBD to check Why
+		// Only K3(=WKUP) is useful
+		key=KEY_Scan(0);
+	  if(key)
+		{						   
+			switch(key)
+			{				 
+				case WKUP_PRES:
+					LED0=!LED0;
+					LEDX=!LEDX;
+					break;
+				case KEY0_PRES:
+					LED0=!LED0;
+					LEDX=!LEDX;
+					break;
+				case KEY1_PRES:
+					LED1=!LED1;
+					break;
+				case KEY2_PRES:
+					LED0=!LED0;
+					LED1=!LED1;
+					break;
+			}
+		}else delay_ms(10);
+    OSTimeDlyHMSM(0,0,0,10);
 	}
 }
 

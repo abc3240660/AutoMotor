@@ -18,6 +18,7 @@
 #define LED0 PEout(3)	 
 #define LED1 PEout(4)	 
 #define LED2 PGout(9)	  
+#define LEDX PFout(11)
 
 void LED_Init(void);//≥ı ºªØ		 				    
 #endif
