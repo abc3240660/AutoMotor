@@ -1,5 +1,6 @@
 #include "led.h"
 #include "includes.h"
+#include "key.h"
 #include "task.h"
 #include "usart1.h"
 #include "usart5.h"
@@ -24,11 +25,19 @@
 int main(void)
 { 
   OS_CPU_SR cpu_sr=0;
-	
+	u8 key;
 	delay_init();		  //初始化延时函数 利用滴答定时器SysTick中断模式延时，也提供了系统节拍
-	LED_Init();		    //初始化LED端口 
+	LED_Init();		    //初始化LED端口
+	KEY_Init();
 	uart1_init(9600);
 
+	LEDX = 0;
+	delay_us(100000);
+	if (0 == KEYX) {
+		printf("KEYX 0\n");
+	} else {
+		printf("KEYX 1\n");
+	}
 #if 0
 	uart5_init(9600);
 	uart6_init(9600);

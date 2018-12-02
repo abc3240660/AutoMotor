@@ -33,11 +33,11 @@ void TIM2_Init(u16 auto_data,u16 fractional)
         
         GPIO_InitStructure.GPIO_Mode=GPIO_Mode_AF;        //????
         GPIO_InitStructure.GPIO_OType=GPIO_OType_PP;        //
-        GPIO_InitStructure.GPIO_Pin=GPIO_Pin_5;
+        GPIO_InitStructure.GPIO_Pin=GPIO_Pin_0;
         GPIO_InitStructure.GPIO_PuPd=GPIO_PuPd_UP;        //
         GPIO_InitStructure.GPIO_Speed=GPIO_Speed_100MHz;
         GPIO_Init(GPIOA,&GPIO_InitStructure);                //???GPIOA_0
-        GPIO_PinAFConfig(GPIOA,GPIO_PinSource5,GPIO_AF_TIM2);
+        GPIO_PinAFConfig(GPIOA,GPIO_PinSource0,GPIO_AF_TIM2);
 	
         TIM_TimeBaseInitStructure.TIM_ClockDivision=TIM_CKD_DIV1;
         TIM_TimeBaseInitStructure.TIM_CounterMode=TIM_CounterMode_Up;
@@ -79,6 +79,9 @@ void TIM4_IRQHandler(void)
 		exp_num++;
 		total_msTtemp=exp_num*1000;
 		pluse_num_new = TIM_GetCounter(TIM2);//每1s中读取脉冲数
+		if (pluse_num_old != pluse_num_new) {
+			total_ms = 1;
+		}
 		pluse_num =pluse_num_new - pluse_num_old;
 		pluse_num_old = pluse_num_new;
 	}

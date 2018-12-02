@@ -4,6 +4,8 @@
 #include "exti.h"
 #include "timer.h"
 #include "usart1.h"
+#include "key.h"
+
 /*********************************************************************************
 *********************启明欣欣 STM32F407应用开发板(高配版)*************************
 **********************************************************************************
@@ -20,14 +22,32 @@
 OS_STK  LED0_TASK_STK[LED0_STK_SIZE];  //任务堆栈	
 
 void LED0_Task(void *pdata)
-{	 	
+{	
 	while(1)
 	{
-		//LED0=0;
-		OSTimeDlyHMSM(0,0,0,300);
-		//LED0=1;
-		OSTimeDlyHMSM(0,0,0,300);
-	};
+		key_scan(0);	
+
+		if(keydown_data==KEY0_DATA)   //key0???????????
+		{
+		  LED0=0;
+			LED1=!LED1;
+			LED2=0;
+			LEDX =!LEDX;
+		}
+		if(keyup_data==KEY1_DATA)     //key1????????????
+		{
+			LED0=1;
+		}
+		if(key_tem==KEY2_DATA)  //key2??1???????? ????5ms????????5ms*200=1S
+		{
+			 LED1=1;
+		}
+		if(key_tem==KEY3_DATA)  //key3??2???????? ????5ms????????5ms*400=2S
+		{
+			 LED2=1;
+		}
+    OSTimeDlyHMSM(0,0,0,10);
+	}
 }
 
 
@@ -48,6 +68,7 @@ void LED1_Task(void *pdata)
 }
 //测速task
 	int total_ms=0;
+extern int pluse_num_new;
 extern int pluse_num;
 OS_STK  SPEED_TASK_STK[SPEED_STK_SIZE];  //任务堆栈
 void SPEED_CAL_Task(void *pdata)
@@ -74,7 +95,7 @@ void SPEED_CAL_Task(void *pdata)
 		speed=((Freq/8.0)*3.14*0.465*trans_rate);
 		memset(temp,0x00,128);
 
-		printf("pluse_num= %d speed=%d km/h\n",pluse_num,(int)(speed*1000/3600));
+		printf("pluse_num_new=%d pluse_num= %d speed=%d km/h\n",pluse_num_new,pluse_num,(int)(speed*1000/3600));
 
 	};
 }
