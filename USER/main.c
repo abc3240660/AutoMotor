@@ -99,6 +99,31 @@ void system_init(void)
 	} else {
 		printf("Read SD Failed!\r\n");
 	}
+	
+	u32 br;
+	char log_buf[] = "hello log\r\n"; 
+	FIL f_txt;
+	res=f_open(&f_txt,(const TCHAR*)"0:/test01.txt",FA_READ|FA_WRITE|FA_CREATE_ALWAYS);
+	if(res==0)
+	{
+		f_lseek(&f_txt,0);
+		f_write(&f_txt,log_buf,strlen((const char*)log_buf),(UINT*)&br);
+		f_close(&f_txt);
+	}
+	
+	u32 len = 0;
+	while(1) {
+		delay_ms(1000);
+		
+		len += 10;
+		res=f_open(&f_txt,(const TCHAR*)"0:/test01.txt",FA_READ|FA_WRITE);
+		if(res==0)
+		{
+			f_lseek(&f_txt,len);
+			f_write(&f_txt,log_buf,strlen((const char*)log_buf),(UINT*)&br);
+			f_close(&f_txt);
+		}
+	}
 }   
 
 //main函数	  					
@@ -143,6 +168,13 @@ void main_task(void *pdata)
 //执行最不需要时效性的代码
 void usart_task(void *pdata)
 {	 
+	u8 res;
+	u32 br;
+	char log_buf[] = "hello log"; 
+	FIL f_txt;
+	
+	delay_ms(2000);
+	delay_ms(2000);
 	delay_ms(2000);
 	
 	while(1) {
@@ -150,6 +182,15 @@ void usart_task(void *pdata)
 		cpr74_read_calypso();
 		
 		printf("Hall Counter = %d\n", pluse_num_new);
+/*
+		res=f_open(&f_txt,(const TCHAR*)"0:/test01.txt",FA_READ|FA_WRITE);
+		if(res==0)
+		{
+			f_lseek(&f_txt,0);
+			f_write(&f_txt,log_buf,strlen((const char*)log_buf),(UINT*)&br);
+			f_close(&f_txt);
+		}
+*/
 	}
 }
 
