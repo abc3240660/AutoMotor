@@ -34,7 +34,7 @@ __packed typedef struct
 	u8 tflimit;		//高音频率限定,范围:1~15(单位:Khz)
 	u8 treble;		//高音,范围:0~15(单位:1.5dB)(原本范围是:-8~7,通过函数修改了);
 	u8 effect;		//空间效果设置.0,关闭;1,最小;2,中等;3,最大.
-
+	u8 speakersw;	//板载喇叭开关,0,关闭;1,打开 
 	u8 saveflag; 	//保存标志,0X0A,保存过了;其他,还从未保存	   
 }_vs10xx_obj;
 
@@ -76,10 +76,16 @@ extern _vs10xx_obj vsset;		//VS10XX设置
 #define SM_ADPCM        	0x1000   
 #define SM_ADPCM_HP     	0x2000 		 
 
+#define I2S_CONFIG			0XC040
+#define GPIO_DDR			0XC017
+#define GPIO_IDATA			0XC018
+#define GPIO_ODATA			0XC019
+
 
 
 u16  VS_RD_Reg(u8 address);				//读寄存器
 u16  VS_WRAM_Read(u16 addr);	    	//读RAM
+void VS_WRAM_Write(u16 addr,u16 val);	//写RAM
 void VS_WR_Data(u8 data);				//写数据
 void VS_WR_Cmd(u8 address,u16 data);	//写命令
 u8   VS_HD_Reset(void);			    	//硬复位
@@ -106,6 +112,7 @@ void VS_Set_Bands(u16 *buf,u8 bands);	//设置中心频率
 void VS_Set_Vol(u8 volx);				//设置主音量   
 void VS_Set_Bass(u8 bfreq,u8 bass,u8 tfreq,u8 treble);//设置高低音
 void VS_Set_Effect(u8 eft);				//设置音效
+void VS_SPK_Set(u8 sw);					//板载喇叭输出开关控制
 void VS_Set_All(void);
 
 void vs10xx_read_para(_vs10xx_obj * vs10xxdev);

@@ -7,6 +7,8 @@
 #include "can1.h"
 #include "can2.h"
 #include "rfid.h"
+#include "vs10xx.h"
+#include "mp3play.h"
 
 /////////////////////////UCOSII任务设置///////////////////////////////////
 //START 任务
@@ -81,6 +83,8 @@ void system_init(void)
 	TIM2_Init(9999,8399);	
 	TIM4_Init(9999,8399);
 	
+	VS_Init();	  				//初始化VS1053
+	
 	delay_ms(1500);
 	
  	exfuns_init();// alloc for fats
@@ -100,6 +104,9 @@ void system_init(void)
 		printf("Read SD Failed!\r\n");
 	}
 	
+	mp3Play("0:/siqi.mp3");
+	
+#if 0	
 	u32 br;
 	char log_buf[] = "hello log\r\n"; 
 	FIL f_txt;
@@ -124,6 +131,7 @@ void system_init(void)
 			f_close(&f_txt);
 		}
 	}
+#endif
 }   
 
 //main函数	  					

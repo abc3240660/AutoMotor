@@ -365,7 +365,7 @@
               <MiscControls></MiscControls>
               <Define>STM32F40_41xxx,USE_USB_OTG_FS,USE_STDPERIPH_DRIVER</Define>
               <Undefine></Undefine>
-              <IncludePath>..\SYSTEM\delay;..\SYSTEM\sys;..\SYSTEM\usart;..\HARDWARE\LED;..\HARDWARE\BEEP;..\HARDWARE\KEY;..\HARDWARE\EXTI;..\HARDWARE\WDG;..\HARDWARE\TIMER;..\HARDWARE\RTC;..\HARDWARE\WKUP;..\HARDWARE\DMA;..\HARDWARE\SPI;..\HARDWARE\W25QXX;..\HARDWARE\CAN;..\HARDWARE\MPU6050;..\HARDWARE\MPU6050\eMPL;..\HARDWARE\USART3;..\HARDWARE\SRAM;..\HARDWARE\SDIO;..\HARDWARE\SIM900A;..\MALLOC;..\FATFS\src;..\FATFS\exfuns;..\UCOSII\CORE;..\UCOSII\PORT;..\UCOSII\CONFIG;..\FWLIB\inc;..\USER;..\CORE;..\HARDWARE\VS10XX;..\HARDWARE\USART5;..\HARDWARE\RFID</IncludePath>
+              <IncludePath>..\SYSTEM\delay;..\SYSTEM\sys;..\SYSTEM\usart;..\HARDWARE\LED;..\HARDWARE\BEEP;..\HARDWARE\KEY;..\HARDWARE\EXTI;..\HARDWARE\WDG;..\HARDWARE\TIMER;..\HARDWARE\RTC;..\HARDWARE\WKUP;..\HARDWARE\DMA;..\HARDWARE\SPI;..\HARDWARE\W25QXX;..\HARDWARE\CAN;..\HARDWARE\MPU6050;..\HARDWARE\MPU6050\eMPL;..\HARDWARE\USART3;..\HARDWARE\SRAM;..\HARDWARE\SDIO;..\HARDWARE\SIM900A;..\MALLOC;..\FATFS\src;..\FATFS\exfuns;..\UCOSII\CORE;..\UCOSII\PORT;..\UCOSII\CONFIG;..\FWLIB\inc;..\USER;..\CORE;..\HARDWARE\VS10XX;..\HARDWARE\USART5;..\HARDWARE\RFID;..\APP</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -502,6 +502,11 @@
               <FileName>rfid.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\HARDWARE\RFID\rfid.c</FilePath>
+            </File>
+            <File>
+              <FileName>vs10xx.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\VS10XX\vs10xx.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -822,6 +827,16 @@
               <FileName>startup_stm32f40_41xxx.s</FileName>
               <FileType>2</FileType>
               <FilePath>..\CORE\startup_stm32f40_41xxx.s</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>APP</GroupName>
+          <Files>
+            <File>
+              <FileName>mp3play.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\APP\mp3play.c</FilePath>
             </File>
           </Files>
         </Group>
