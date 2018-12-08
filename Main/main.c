@@ -24,8 +24,12 @@
 
 int main(void)
 { 
-  OS_CPU_SR cpu_sr=0;
+	
+	OS_CPU_SR cpu_sr=0;
 	u8 key;
+	//SCB->VTOR = FLASH_BASE | 0x10000;
+	SCB->VTOR = *((u32 *)0x0800FFF8);
+	
 	delay_init();		  //初始化延时函数 利用滴答定时器SysTick中断模式延时，也提供了系统节拍
 	LED_Init();		    //初始化LED端口
 	KEY_Init();
