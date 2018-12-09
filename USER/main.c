@@ -104,32 +104,20 @@ void system_init(void)
 		printf("Read SD Failed!\r\n");
 	}
 	
-	mp3Play("0:/siqi.mp3");
+#if 0
+	u16 xx = 0;
+	delay_ms(1000);
+	xx = VS_Ram_Test();
+	delay_ms(1000);
+	music_play();
 	
-#if 0	
-	u32 br;
-	char log_buf[] = "hello log\r\n"; 
-	FIL f_txt;
-	res=f_open(&f_txt,(const TCHAR*)"0:/test01.txt",FA_READ|FA_WRITE|FA_CREATE_ALWAYS);
-	if(res==0)
+	while(1)
 	{
-		f_lseek(&f_txt,0);
-		f_write(&f_txt,log_buf,strlen((const char*)log_buf),(UINT*)&br);
-		f_close(&f_txt);
-	}
-	
-	u32 len = 0;
-	while(1) {
 		delay_ms(1000);
-		
-		len += 10;
-		res=f_open(&f_txt,(const TCHAR*)"0:/test01.txt",FA_READ|FA_WRITE);
-		if(res==0)
-		{
-			f_lseek(&f_txt,len);
-			f_write(&f_txt,log_buf,strlen((const char*)log_buf),(UINT*)&br);
-			f_close(&f_txt);
-		}
+ 		LED1=0; 	   
+ 		VS_Sine_Test();	   	 
+		delay_ms(1000);
+		LED1=1;
 	}
 #endif
 }   

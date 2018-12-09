@@ -1,6 +1,7 @@
 #ifndef __VS10XX_H__
 #define __VS10XX_H__
 #include "sys.h"
+#include "common.h"
 //////////////////////////////////////////////////////////////////////////////////	 
 //本程序只供学习使用，未经作者许可，不得用于其它任何用途
 //ALIENTEK战舰STM32开发板
@@ -14,16 +15,19 @@
 //All rights reserved													    								  
 //////////////////////////////////////////////////////////////////////////////////
 
-
 //////////////////////////////////////////////////////////////
 //与外部的接口
+#ifdef QMXX_STM32
+#define VS_DQ       PCin(6)  	//DREQ  B11
+#define VS_RST      PBout(12) 	  //RST  B0
+#define VS_XCS      PCout(13)  	//XCS  B12
+#define VS_XDCS     PCout(0)  	//XDCS  B10
+#else
 #define VS_DQ       PAin(2)  	//DREQ 
 #define VS_RST      PAout(3) 	//RST
 #define VS_XCS      PAout(4)  	//XCS
-#define VS_XDCS     PAout(5)  	//XDCS 
-#define VS_SCLK     PAout(1)  	//SCLK
-#define VS_SIDO     PEout(5)  	//MOSI send data to VS1003
-#define VS_SODI     PEin(2)  	  //MISO read data from VS1003
+#define VS_XDCS     PAout(5)  	//XDCS
+#endif
 //////////////////////////////////////////////////////////////
 
 __packed typedef struct 
@@ -120,6 +124,7 @@ void vs10xx_save_para(_vs10xx_obj * vs10xxdev);
 
 void VS_Damon_test(void);
 void Vs1003_DATA_Write(unsigned char data);
+unsigned char mp3Play(const char* mp3name);
 
 #endif
 

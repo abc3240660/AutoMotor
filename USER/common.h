@@ -27,6 +27,9 @@
 #define HARDWARE_VERSION	   		15		//硬件版本,放大10倍,如1.0表示为10
 #define SOFTWARE_VERSION	    	200		//软件版本,放大100倍,如1.00,表示为100
 
+// For VS1003 to Suport Double HW Board
+#define QMXX_STM32 1
+
 //系统数据保存基址			  
 #define SYSTEM_PARA_SAVE_BASE 		100		//系统信息保存首地址.从100开始.
 
