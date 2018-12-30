@@ -125,6 +125,7 @@ void system_init(void)
 //main函数	  					
 int main(void)
 { 	
+	SCB->VTOR = *((u32 *)0x0800FFF8);
 	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);//设置系统中断优先级分组2
   system_init();		//系统初始化 
  	OSInit();   
