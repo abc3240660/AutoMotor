@@ -10,6 +10,10 @@
 #include "can1.h"
 #include "rfid.h"
 
+// BIT7: 0-idle, 1-changed
+// BIT0: 0-Close, 1-Open
+u8 g_door_sta = 0;
+
 __sim7500dev sim7500dev;	//sim7500控制器
 
 const char* cmd_list[] = {
@@ -18,11 +22,27 @@ const char* cmd_list[] = {
 	CMD_INQUIRE_PARAM,
 	CMD_RING_ALARM,
 	CMD_OPEN_DOOR,
+	CMD_CLOSE_DOOR,
 	CMD_DOOR_CLOSED,
+	CMD_DOOR_OPENED,
 	CMD_JUMP_LAMP,
 	CMD_CALYPSO_UPLOAD,
 	CMD_ENGINE_START,
-	CMD_CLOSE_DOOR,
+	CMD_INVALID_MOVE,
+	CMD_REPORT_GPS,
+	CMD_IAP_SUCCESS,
+	CMD_MP3DW_SUCCESS,
+	CMD_CHARGE_STARTED,
+	CMD_CHARGE_STOPED,
+	CMD_DEV_SHUTDOWN,
+	CMD_QUERY_GPS,
+	CMD_IAP_REQUEST,
+	CMD_MP3_UPDATE_REQ,	
+	CMD_MP3_PLAY_REQ,
+	CMD_START_TRACE,
+	CMD_STOP_TRACE,
+	CMD_QUERY_BMS,
+	CMD_QUERY_MP3,
 	NULL
 };
 
@@ -207,7 +227,7 @@ void sim7500e_tcp_send(char* send)
 }
 
 // DEV ACK
-void sim7500e_do_engine_start(char* send)
+void sim7500e_do_engine_start_ack(char* send)
 {
 	CAN1_StartEngine();
 
@@ -220,7 +240,7 @@ void sim7500e_do_engine_start(char* send)
 }
 
 // DEV ACK
-void sim7500e_do_open_door(char* send)
+void sim7500e_do_open_door_ack(char* send)
 {
 	CAN1_OpenDoor();
 
@@ -233,7 +253,7 @@ void sim7500e_do_open_door(char* send)
 }
 
 // DEV ACK
-void sim7500e_do_close_door(char* send)
+void sim7500e_do_close_door_ack(char* send)
 {
 	CAN1_CloseDoor();
 
@@ -246,7 +266,7 @@ void sim7500e_do_close_door(char* send)
 }
 
 // DEV ACK
-void sim7500e_do_jump_lamp(char* send)
+void sim7500e_do_jump_lamp_ack(char* send)
 {
 	CAN1_JumpLamp();
 
@@ -259,7 +279,7 @@ void sim7500e_do_jump_lamp(char* send)
 }
 
 // DEV ACK
-void sim7500e_do_ring_alarm(char* send)
+void sim7500e_do_ring_alarm_ack(char* send)
 {
 	CAN1_RingAlarm();
 
@@ -272,7 +292,7 @@ void sim7500e_do_ring_alarm(char* send)
 }
 
 // DEV Auto Send
-u8 sim7500e_do_dev_register(char* send)
+u8 sim7500e_do_dev_register_auto(char* send)
 {
 	memset(send, 0, LEN_MAX_SEND);
 	sprintf(send, "%s,%s,%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_REGISTER, HW_VERSION, SW_VERSION, bat_vol);
@@ -285,7 +305,7 @@ u8 sim7500e_do_dev_register(char* send)
 }
 
 // DEV Auto Send
-void sim7500e_do_heart_beat(char* send)
+void sim7500e_do_heart_beat_auto(char* send)
 {
 	memset(send, 0, LEN_MAX_SEND);
 	sprintf(send, "%s,%s,%s,%s,%s,%d,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_HEART_BEAT, dev_time, lock_state, rssi, bat_vol);
@@ -296,7 +316,7 @@ void sim7500e_do_heart_beat(char* send)
 }
 
 // DEV Auto SEND
-void sim7500e_do_door_closed(char* send)
+void sim7500e_do_door_closed_report(char* send)
 {
 	memset(send, 0, LEN_MAX_SEND);
 	sprintf(send, "%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DOOR_CLOSED);
@@ -307,7 +327,89 @@ void sim7500e_do_door_closed(char* send)
 }
 
 // DEV Auto SEND
-void sim7500e_do_calypso_upload(char* send)
+void sim7500e_do_door_opened_report(char* send)
+{
+	memset(send, 0, LEN_MAX_SEND);
+	sprintf(send, "%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DOOR_OPENED);
+
+	printf("SEND:%s\n", send);
+	
+	sim7500e_tcp_send(send);
+}
+
+// DEV Auto SEND
+void sim7500e_do_invalid_moving_report(char* send)
+{
+	memset(send, 0, LEN_MAX_SEND);
+	sprintf(send, "%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_INVALID_MOVE);
+
+	printf("SEND:%s\n", send);
+	
+	sim7500e_tcp_send(send);
+}
+
+// DEV Auto SEND
+void sim7500e_do_report_gps_auto(char* send)
+{
+	memset(send, 0, LEN_MAX_SEND);
+
+	if (strlen(g_longitude) > 5) {
+		sprintf(send, "%s,%s,%s,%s,%s,%s,0$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_REPORT_GPS, g_longitude, g_latitude);
+	} else {
+		sprintf(send, "%s,%s,%s,%s,F,F,0$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_REPORT_GPS);
+	}
+
+	printf("SEND:%s\n", send);
+	
+	sim7500e_tcp_send(send);
+}
+
+// DEV Auto SEND
+void sim7500e_do_iap_success_report(char* send)
+{
+	memset(send, 0, LEN_MAX_SEND);
+	sprintf(send, "%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_IAP_SUCCESS, g_sw_version);
+
+	printf("SEND:%s\n", send);
+	
+	sim7500e_tcp_send(send);
+}
+
+// DEV Auto SEND
+void sim7500e_do_charge_start_report(char* send)
+{
+	memset(send, 0, LEN_MAX_SEND);
+	sprintf(send, "%s,%s,%s,%s,%s,%d$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_CHARGE_STARTED, g_power_volume, g_chage_times);
+
+	printf("SEND:%s\n", send);
+	
+	sim7500e_tcp_send(send);
+}
+
+// DEV Auto SEND
+void sim7500e_do_charge_stop_report(char* send)
+{
+	memset(send, 0, LEN_MAX_SEND);
+	sprintf(send, "%s,%s,%s,%s,%s,%d$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_CHARGE_STOPED, g_power_volume, g_chage_times);
+
+	printf("SEND:%s\n", send);
+	
+	sim7500e_tcp_send(send);
+}
+
+// DEV ACK
+void sim7500e_do_mp3_dw_success_ack(char* send)
+{
+	memset(send, 0, LEN_MAX_SEND);
+	sprintf(send, "%s,%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_MP3DW_SUCCESS, g_cur_mp3_name);
+
+	printf("SEND:%s\n", send);
+	
+	sim7500e_tcp_send(send);
+}
+
+// DEV Auto SEND
+void sim7500e_do_calypso_report(char* send)
 {
 	memset(send, 0, LEN_MAX_SEND);
 	sprintf(send, "%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_CALYPSO_UPLOAD, calypso_card_id);
@@ -350,11 +452,11 @@ void sim7500e_parse_msg(char* msg, char* send)
 					}
 					
 					if (OPEN_DOOR == cmd_type) {
-						sim7500e_do_open_door(send);
+						sim7500e_do_open_door_ack(send);
 					} else if (ENGINE_START == cmd_type) {
-						sim7500e_do_engine_start(send);
+						sim7500e_do_engine_start_ack(send);
 					} else if (CLOSE_DOOR == cmd_type) {
-						sim7500e_do_close_door(send);
+						sim7500e_do_close_door_ack(send);
 					}
 				} else {
 					// TBD
@@ -377,11 +479,11 @@ void sim7500e_parse_msg(char* msg, char* send)
 			} else if (RING_ALARM == cmd_type) {
 				ring_times = atoi(split_str);
 				printf("ring_times = %d\n", ring_times);
-				sim7500e_do_ring_alarm(send);
+				sim7500e_do_ring_alarm_ack(send);
 			} else if (JUMP_LAMP == cmd_type) {
 				lamp_times = atoi(split_str);
 				printf("lamp_times = %d\n", lamp_times);
-				sim7500e_do_jump_lamp(send);
+				sim7500e_do_jump_lamp_ack(send);
 			}
 		}
 		split_str = strtok(NULL, delims);
@@ -544,7 +646,7 @@ CIPOPEN:
 	if(sim7500e_send_cmd("Hello","OK",200))return;
 	delay_ms(100);
 	delay_ms(100);
-	if(sim7500e_do_dev_register(send_buf))return;
+	if(sim7500e_do_dev_register_auto(send_buf))return;
 	delay_ms(100);
 	delay_ms(100);
 	while(1)
@@ -571,11 +673,18 @@ CIPOPEN:
 			//if(strstr((const char*)USART3_RX_BUF,"CONNECT OK"))connectsta=1;
 			connectsta=1;
 		}
+		if(connectsta==1&&g_door_sta&0X80)// Door Changed
+			if (g_door_sta&0x01) {// OPEN
+				sim7500e_do_door_opened_report(send_buf);
+			} else {// CLOSE
+				sim7500e_do_door_closed_report(send_buf);
+			}
+		}
 		if(connectsta==1&&timex>=600)//连接正常的时候,每6秒发送一次心跳
 		{
 			timex=0;
 			
-			sim7500e_do_heart_beat(send_buf);
+			sim7500e_do_heart_beat_auto(send_buf);
 				
 			hbeaterrcnt++; 
 			printf("hbeaterrcnt:%d\r\n",hbeaterrcnt);//方便调试代码
@@ -634,7 +743,7 @@ CIPOPEN:
 			USART3_RX_STA=0;
 		} else {
 			if (calypso_card_id[0] != 0) {
-				sim7500e_do_calypso_upload(send_buf);
+				sim7500e_do_calypso_report(send_buf);
 				calypso_card_id[0] = 0;
 			}
 		}
