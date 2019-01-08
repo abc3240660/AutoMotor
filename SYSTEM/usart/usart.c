@@ -132,30 +132,31 @@ extern u8 g_invaid_move;
 extern u8 g_charge_sta;
 extern u8 g_mp3_play;
 extern u8 g_mp3_name_play[32];
+extern int gps_report_gap;
 
 void debug_process(void)
 {
-	if (0 == strncmp(USART_RX_BUF, SET_GPS_GAP, strlen(SET_GPS_GAP))) {
-		hbeat_time = atoi(USART_RX_BUF+strlen(SET_GPS_GAP));
-	} else if (0 == strncmp(USART_RX_BUF, SET_HBEAT_GAP, strlen(SET_HBEAT_GAP))) {
-		gps_report_gap = atoi(USART_RX_BUF+strlen(SET_HBEAT_GAP));
-	} else if (0 == strncmp(USART_RX_BUF, TRIG_DOOR_OPENED, strlen(TRIG_DOOR_OPENED))) {
+	if (0 == strncmp((const char*)USART_RX_BUF, SET_GPS_GAP, strlen(SET_GPS_GAP))) {
+		hbeat_time = atoi((const char*)(USART_RX_BUF+strlen(SET_GPS_GAP)));
+	} else if (0 == strncmp((const char*)USART_RX_BUF, SET_HBEAT_GAP, strlen(SET_HBEAT_GAP))) {
+		gps_report_gap = atoi((const char*)(USART_RX_BUF+strlen(SET_HBEAT_GAP)));
+	} else if (0 == strncmp((const char*)USART_RX_BUF, TRIG_DOOR_OPENED, strlen(TRIG_DOOR_OPENED))) {
 		g_door_sta = 1;
 		g_door_sta |= 0x80; 
-	} else if (0 == strncmp(USART_RX_BUF, TRIG_DOOR_CLOSED, strlen(TRIG_DOOR_CLOSED))) {
+	} else if (0 == strncmp((const char*)USART_RX_BUF, TRIG_DOOR_CLOSED, strlen(TRIG_DOOR_CLOSED))) {
 		g_door_sta = 0;
 		g_door_sta |= 0x80; 
-	} else if (0 == strncmp(USART_RX_BUF, TRIG_INVALID_MOVE, strlen(TRIG_INVALID_MOVE))) {
+	} else if (0 == strncmp((const char*)USART_RX_BUF, TRIG_INVALID_MOVE, strlen(TRIG_INVALID_MOVE))) {
 		g_invaid_move = 1;
-	} else if (0 == strncmp(USART_RX_BUF, TRIG_CHARGE_STARTED, strlen(TRIG_CHARGE_STARTED))) {
+	} else if (0 == strncmp((const char*)USART_RX_BUF, TRIG_CHARGE_STARTED, strlen(TRIG_CHARGE_STARTED))) {
 		g_charge_sta = 1;
 		g_charge_sta |= 0x80; 
-	} else if (0 == strncmp(USART_RX_BUF, TRIG_CHARGE_STOPED, strlen(TRIG_CHARGE_STOPED))) {
+	} else if (0 == strncmp((const char*)USART_RX_BUF, TRIG_CHARGE_STOPED, strlen(TRIG_CHARGE_STOPED))) {
 		g_charge_sta = 0;
 		g_charge_sta |= 0x80; 
-	} else if (0 == strncmp(USART_RX_BUF, PLAY_MP3_MUSIC, strlen(PLAY_MP3_MUSIC))) {
+	} else if (0 == strncmp((const char*)USART_RX_BUF, PLAY_MP3_MUSIC, strlen(PLAY_MP3_MUSIC))) {
 		memset(g_mp3_name_play, 0, 32);
-		strcpy(g_mp3_name_play, USART_RX_BUF+strlen(PLAY_MP3_MUSIC));
+		strcpy((char*)g_mp3_name_play, (const char*)(USART_RX_BUF+strlen(PLAY_MP3_MUSIC)));
 		// printf("g_mp3_name_play = %s\n", g_mp3_name_play);
 
 		g_mp3_play = 1;

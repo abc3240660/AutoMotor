@@ -21,7 +21,7 @@ extern UINT br;
 
 unsigned char mp3Play(const char* mp3name)
 {
-	u8 res,i;
+	u8 res;
 	FIL file;
 	
 	res = f_open(&file, mp3name, FA_READ);

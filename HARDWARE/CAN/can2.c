@@ -1,6 +1,11 @@
 #include "can2.h"
 #include "led.h"
 
+u8 g_bms_charging = 0;
+u8 g_bms_temp_max = 30;// 30
+u8 g_bms_temp_min = 30;// 30
+u8 g_bms_vol_percent = 80;// 50%
+u8 g_bms_charged_times = 0;// Save into ExFlash
 /****************************************************************************
 * 名    称: u8 CAN2_Mode_Init(u8 mode)
 * 功    能：CAN初始化
@@ -133,7 +138,31 @@ u8 CAN2_Receive_Msg(u8 *buf)
     if( CAN_MessagePending(CAN2,CAN_FIFO0)==0)return 0;		//没有接收到数据,直接退出 
     CAN_Receive(CAN2, CAN_FIFO0, &RxMessage);//读取数据	
     for(i=0;i<RxMessage.DLC;i++)
-    buf[i]=RxMessage.Data[i];  
+    buf[i]=RxMessage.Data[i];
+
+		if (0x18FF28F4 == RxMessage.ExtId) {
+			if (0x02 == (RxMessage.Data[0]&0x2)) {// battery charging
+				if (0 == g_bms_charging) {
+					g_bms_charging = 1;
+					g_bms_charged_times++;
+				}
+			} else {
+				if (1 == g_bms_charging) {
+					g_bms_charging = 0;
+				}
+			}
+			
+			g_bms_vol_percent = RxMessage.Data[1];
+		} else if (0x18FE28F4 == RxMessage.ExtId) {
+			g_bms_temp_max = RxMessage.Data[4];
+			g_bms_temp_min = RxMessage.Data[5];
+		} else {
+			if (0x18B00000 == (RxMessage.ExtId&0xFFF)) {// All Temp
+				u8 index = ((RxMessage.ExtId&0xFFFF)>>15) - 0x18B4;
+			} else if (0x18C00000 == (RxMessage.ExtId&0xFFF)) {// All Vot
+				u8 index = ((RxMessage.ExtId&0xFFFF)>>15) - 0x18C8;
+			} 
+		}
 	return RxMessage.DLC;	
 }
 

@@ -240,34 +240,15 @@ static RET_RFID cpr74_select_stage2()
 
 // SEND:02000EFFB2BE8100B201E41D011D
 // RECV:02002A00B20002000004004C21808400000095584E3F90000805C0C8400019500101492492FC90001E6E
+// NEW-RECV:    020045001F04004C21808400000095584E3F90000805C0C8400019500101492492FC90001FB20CCA0000000000000000000000000000000000000000000000000000900003E8
 static RET_RFID cpr74_apdu_stage1()
 {
 	RET_RFID ret = RET_RFID_OK;
 
-	cpr74_send_buf[0] = 0x02;
-	cpr74_send_buf[1] = 0x00;
-	cpr74_send_buf[2] = 0x0E;
-	cpr74_send_buf[3] = 0xFF;
-	cpr74_send_buf[4] = 0xB2;
-	cpr74_send_buf[5] = 0xBE;
-	cpr74_send_buf[6] = 0x81;
-	cpr74_send_buf[7] = 0x00;
-	cpr74_send_buf[8] = 0xB2;
-	cpr74_send_buf[9] = 0x01;
-	cpr74_send_buf[10] = 0xE4;
-	cpr74_send_buf[11] = 0x1D;
-	cpr74_send_buf[12] = 0x01;
-	cpr74_send_buf[13] = 0x1D;
-
-	ret = cpr74_send_cmd(cpr74_send_buf, 0x0E, 0x2A, 100);
-	if (ret != RET_RFID_OK) {
-		return ret;
-	}
-
 	// Get Card ID
 	pGotVal = calypso_card_id;
 
-	cpr74_parse_ack(22*4+3, 76);
+	cpr74_parse_ack(14*4+3, 76);
 
 	return ret;
 }
@@ -276,27 +257,7 @@ RET_RFID cpr74_read_calypso(void)
 {
 	RET_RFID ret = RET_RFID_OK;
 
-	ret = cpr74_inventory();
-	if (ret != RET_RFID_OK) {
-		cpr74_error_msg(ret);
-		return ret;
-	}
-#if 1
-	ret = cpr74_select_stage1();
-	if (ret != RET_RFID_OK) {
-		cpr74_error_msg(ret);
-		return ret;
-	}
-#if 0
-	ret = cpr74_select_stage2();
-	if (ret != RET_RFID_OK) {
-		return ret;
-	}
-#endif
-	ret = cpr74_apdu_stage1();
-	if (ret != RET_RFID_OK) {
-		cpr74_error_msg(ret);
-	}
-#endif
+	cpr74_apdu_stage1();
+	
 	return ret;
 }

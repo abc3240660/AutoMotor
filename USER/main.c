@@ -9,6 +9,7 @@
 #include "rfid.h"
 #include "vs10xx.h"
 #include "mp3play.h"
+#include "rtc.h"
 
 /////////////////////////UCOSII任务设置///////////////////////////////////
 //START 任务
@@ -54,25 +55,43 @@ void watch_task(void *pdata);
 
 int total_ms=0;
 extern int pluse_num_new;
+int g_sd_existing = 0;
+
+OS_EVENT * sem_beep;
+u8 g_logname[64] = "";
+u8 g_logmsg[256] = "";
+
+void create_logfile(void);
+void write_logs(char *module, char *log, u16 size, u8 mode);
 //////////////////////////////////////////////////////////////////////////////	 
 
 //系统初始化
 void system_init(void)
 {
-	u8 res;
-	u16 temp=0;
-	u32 dtsize,dfsize;
 	u8 CAN1_mode=0; //CAN工作模式;0,普通模式;1,环回模式
 	u8 CAN2_mode=0; //CAN工作模式;0,普通模式;1,环回模式	
 	
 	delay_init(168);			//延时初始化  
 	uart_init(115200);		//初始化串口波特率为115200
 	usart3_init(115200);		//初始化串口3波特率为115200
-	usart5_init(38400);
+	usart5_init(115200);
+
  	LED_Init();					//初始化LED 
  	KEY_Init();					//按键初始化 
-//	W25QXX_Init();				//初始化W25Q128
 
+#if 0
+	W25QXX_Init();				//初始化W25Q128
+
+	g_sys_env.charge_times = 123;
+	
+	sys_env_init();
+	sys_env_save();
+	sys_env_dump();
+#endif
+
+	My_RTC_Init();		 		//初始化RTC
+	RTC_Set_WakeUp(RTC_WakeUpClock_CK_SPRE_16bits,0);		//配置WAKE UP中断,1秒钟中断一次
+		
 	printf("SmartMotor Starting...\n");
 	CAN1_Mode_Init(CAN1_mode);//CAN初始化普通模式,波特率250Kbps
 	CAN2_Mode_Init(CAN2_mode);//CAN初始化普通模式,波特率500Kbps 
@@ -84,7 +103,7 @@ void system_init(void)
 	TIM4_Init(9999,8399);
 	
 	VS_Init();	  				//初始化VS1053
-	
+#if 0	
 	delay_ms(1500);
 	
  	exfuns_init();// alloc for fats
@@ -99,10 +118,13 @@ void system_init(void)
 	} while(res&&temp<5);
 	
  	if(res==0) {
+		g_sd_existing = 1;
 		printf("Read SD OK!\r\n");
 	} else {
 		printf("Read SD Failed!\r\n");
 	}
+	
+	create_logfile();
 	
 #if 0
 	u16 xx = 0;
@@ -120,7 +142,17 @@ void system_init(void)
 		LED1=1;
 	}
 #endif
+#endif
 }   
+
+void SoftReset(void)
+{  
+	while (1) {
+		delay_ms(1000);
+	}
+	__set_FAULTMASK(1);
+ 	NVIC_SystemReset();
+}
 
 //main函数	  					
 int main(void)
@@ -138,6 +170,7 @@ void start_task(void *pdata)
 {  
 	OS_CPU_SR cpu_sr=0;
 	pdata = pdata; 	   
+	sem_beep=OSSemCreate(1);
 	OSStatInit();		//初始化统计任务.这里会延时1秒钟左右	
 // 	app_srand(OSTime);
 	
@@ -162,32 +195,79 @@ void main_task(void *pdata)
 //	cpr74_read_calypso();
 }
 
-//执行最不需要时效性的代码
-void usart_task(void *pdata)
-{	 
-	u8 res;
-	u32 br;
-	char log_buf[] = "hello log"; 
-	FIL f_txt;
-	
-	delay_ms(2000);
-	delay_ms(2000);
-	delay_ms(2000);
-	
-	while(1) {
-		delay_ms(3000);
-		cpr74_read_calypso();
+void create_logfile(void)
+{
+	if (0 == g_sd_existing) {
+		return;
+	} else {
+		u8 res;
+		FIL f_txt;
+		RTC_TimeTypeDef RTC_TimeStruct;
+		RTC_DateTypeDef RTC_DateStruct;
 		
-		printf("Hall Counter = %d\n", pluse_num_new);
-/*
-		res=f_open(&f_txt,(const TCHAR*)"0:/test01.txt",FA_READ|FA_WRITE);
-		if(res==0)
-		{
-			f_lseek(&f_txt,0);
-			f_write(&f_txt,log_buf,strlen((const char*)log_buf),(UINT*)&br);
+		RTC_GetTime(RTC_Format_BIN,&RTC_TimeStruct);
+		RTC_GetDate(RTC_Format_BIN, &RTC_DateStruct);
+		
+		sprintf((char*)g_logname,"0:/LOG/20%02d%02d%02d_%02d%02d%02d.log",RTC_DateStruct.RTC_Year,RTC_DateStruct.RTC_Month,RTC_DateStruct.RTC_Date,RTC_TimeStruct.RTC_Hours,RTC_TimeStruct.RTC_Minutes,RTC_TimeStruct.RTC_Seconds);
+		
+		res = f_open(&f_txt,(const TCHAR*)g_logname,FA_READ|FA_WRITE|FA_CREATE_ALWAYS);
+		if (0 == res) {
 			f_close(&f_txt);
 		}
-*/
+	}
+}
+
+void write_logs(char *module, char *log, u16 size, u8 mode)
+{
+	if (0 == g_sd_existing) {
+		return;
+	} else {
+		u8 err;
+		u8 res;
+		u32 br;
+		//char log_buf[] = "hello log"; 
+		FIL f_txt;
+		RTC_TimeTypeDef RTC_TimeStruct;
+		
+		RTC_GetTime(RTC_Format_BIN,&RTC_TimeStruct);
+		
+		memset(g_logmsg, 0, 256);
+		
+		if (0 == mode) {
+			sprintf((char*)g_logmsg,"%02d%02d%02d:RECV Data(%s) %s\n",RTC_TimeStruct.RTC_Hours,RTC_TimeStruct.RTC_Minutes,RTC_TimeStruct.RTC_Seconds,module,log);
+		} else if (1 == mode) {
+			sprintf((char*)g_logmsg,"%02d%02d%02d:SEND Data(%s) %s\n",RTC_TimeStruct.RTC_Hours,RTC_TimeStruct.RTC_Minutes,RTC_TimeStruct.RTC_Seconds,module,log);
+		} else if (2 == mode) {
+			sprintf((char*)g_logmsg,"%02d%02d%02d:IMPT Data(%s) %s\n",RTC_TimeStruct.RTC_Hours,RTC_TimeStruct.RTC_Minutes,RTC_TimeStruct.RTC_Seconds,module,log);
+		} else {
+			sprintf((char*)g_logmsg,"%02d%02d%02d:OTHR Data(%s) %s\n",RTC_TimeStruct.RTC_Hours,RTC_TimeStruct.RTC_Minutes,RTC_TimeStruct.RTC_Seconds,module,log);
+		}
+		
+		printf("%s", g_logmsg);
+		
+		OSSemPend(sem_beep,0,&err);
+		res= f_open(&f_txt,(const TCHAR*)g_logname,FA_READ|FA_WRITE);
+		if(res==0)
+		{			
+			f_lseek(&f_txt, f_txt.fsize);
+			f_write(&f_txt,g_logmsg, strlen((const char*)g_logmsg), (UINT*)&br);
+			f_close(&f_txt);
+		}
+		OSSemPost(sem_beep);
+	}
+}
+
+//执行最不需要时效性的代码
+void usart_task(void *pdata)
+{
+	while(1) {
+		delay_ms(3000);
+		if((UART5_RX_STA&(1<<15)) != 0) {
+			cpr74_read_calypso();
+			UART5_RX_STA = 0;
+		}
+		
+		printf("Hall Counter = %d\n", pluse_num_new);
 	}
 }
 
@@ -195,7 +275,6 @@ void usart_task(void *pdata)
 void watch_task(void *pdata)
 {
 	u8 key;
-  OS_CPU_SR cpu_sr=0; 
 	
 	while(1)
 	{

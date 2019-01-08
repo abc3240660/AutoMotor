@@ -6,6 +6,7 @@
 
 typedef struct 
 {							  
+	u8 tcp_status;// 0-idle, 1-Connect OK, 2-Connect Failed/Error
  	u8 status;		//SIM7500EA状态
 					//bit7:0,没有找到模块;1,找到模块了
 					//bit6:0,SIM卡不正常;1,SIM卡正常
@@ -110,7 +111,6 @@ enum CMD_TYPE {
 
 u8* sim7500e_check_cmd(u8 *str);
 u8 sim7500e_send_cmd(u8 *cmd,u8 *ack,u16 waittime);
-void sim7500e_cmd_over(void);
 u8 sim7500e_chr2hex(u8 chr);
 u8 sim7500e_hex2chr(u8 hex);
 void sim7500e_unigbk_exchange(u8 *src,u8 *dst,u8 mode);

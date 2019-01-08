@@ -9,7 +9,6 @@
 __align(8) u8 USART3_TX_BUF[USART3_MAX_SEND_LEN]; 	//发送缓冲,最大USART3_MAX_SEND_LEN字节
 //串口接收缓存区 	
 u8 USART3_RX_BUF[USART3_MAX_RECV_LEN]; 				//接收缓冲,最大USART3_MAX_RECV_LEN个字节.
-u8 USART3_RX_BUF_BAK[USART3_MAX_RECV_LEN];
 
 //通过判断接收连续2个字符之间的时间差不大于10ms来决定是不是一次连续的数据.
 //如果2个字符接收间隔超过10ms,则认为不是1次连续数据.也就是超过10ms没有接收到
@@ -18,7 +17,6 @@ u8 USART3_RX_BUF_BAK[USART3_MAX_RECV_LEN];
 //[15]:0,没有接收到数据;1,接收到了一批数据.
 //[14:0]:接收到的数据长度
 vu16 USART3_RX_STA=0;   	 
-vu16 USART3_RX_STA_BAK=0;
 void USART3_IRQHandler(void)
 {
 	u8 res;	    
@@ -26,8 +24,6 @@ void USART3_IRQHandler(void)
 	if(USART_GetFlagStatus(USART3, USART_FLAG_RXNE) != RESET)//接收到数据
 	{	 
 		res=USART_ReceiveData(USART3); 			 
-//		while((USART1->SR&0X40)==0);//循环发送,直到发送完毕   
-//		USART1->DR = (u8) res;
 		if((USART3_RX_STA&(1<<15))==0)//接收完的一批数据,还没有被处理,则不再接收其他数据
 		{ 
 			if(USART3_RX_STA<USART3_MAX_RECV_LEN)	//还可以接收数据
@@ -41,13 +37,7 @@ void USART3_IRQHandler(void)
 			}else 
 			{
 				USART3_RX_STA|=1<<15;				//强制标记接收完成
-			} 
-		} else {
-			if (USART3_RX_STA_BAK >= USART3_MAX_RECV_LEN) {
-				USART3_RX_STA_BAK = 0;
 			}
-			
-			USART3_RX_BUF_BAK[USART3_RX_STA_BAK++]=res;
 		}
 	}  											 
 	OSIntExit();  											 

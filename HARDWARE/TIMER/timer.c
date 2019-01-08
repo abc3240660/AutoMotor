@@ -9,6 +9,8 @@ extern u8 ov_frame;
 extern volatile u16 jpeg_data_len;
 extern void usbapp_pulling(void); 
 
+void write_logs(char *module, char *log, u16 size, u8 mode);
+
 vu8 framecnt;
 vu8 framecntout;
 
@@ -16,7 +18,6 @@ void TIM2_Init(u16 auto_data,u16 fractional)
 {
         GPIO_InitTypeDef GPIO_InitStructure;
         TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStructure;
-        TIM_ICInitTypeDef TIM_ICInitStructure;
         
         RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA,ENABLE);
         RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2,ENABLE);
@@ -339,8 +340,7 @@ void TIM9_CH2_PWM_Init(u16 arr,u16 psc)
 }  
 extern vu16 UART5_RX_STA;
 void TIM6_DAC_IRQHandler(void)
-{ 		
-	u8 i = 0;
+{
 	OSIntEnter();    		    
 	if(TIM_GetITStatus(TIM6,TIM_IT_Update)==SET)
 	{ 
@@ -388,7 +388,9 @@ void TIM7_IRQHandler(void)
 	{	 			   
 		USART3_RX_STA|=1<<15;
 		USART3_RX_BUF[USART3_RX_STA&0X7FFF]=0;
-		printf("SIM7K RECVED: %s\n", USART3_RX_BUF);
+		//printf("SIM7K RECVED: %s\n", USART3_RX_BUF);
+		//printf("SIM7000E Recv Data %s\n", USART3_RX_BUF);
+		//write_logs("SIM7000E", (char*)USART3_RX_BUF, USART3_RX_STA&0X7FFF, 0);
 		TIM_ClearITPendingBit(TIM7,TIM_IT_Update);
    
 		TIM_Cmd(TIM7,DISABLE);

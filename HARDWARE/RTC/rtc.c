@@ -2,7 +2,7 @@
 #include "led.h"
 #include "delay.h"
 #include "usart.h" 
-#include "calendar.h"
+#include "ucos_ii.h"
 //////////////////////////////////////////////////////////////////////////////////	 
 //本程序只供学习使用，未经作者许可，不得用于其它任何用途
 //ALIENTEK STM32F407开发板
@@ -92,7 +92,7 @@ u8 My_RTC_Init(void)
   RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE);//使能PWR时钟
 	PWR_BackupAccessCmd(ENABLE);	//使能后备寄存器访问 
 	
-	if(RTC_ReadBackupRegister(RTC_BKP_DR0)!=0x5050)		//是否第一次配置?
+	if(RTC_ReadBackupRegister(RTC_BKP_DR0)!=0x5153)		//是否第一次配置?
 	{
 		RCC_LSEConfig(RCC_LSE_ON);//LSE 开启    
 		while (RCC_GetFlagStatus(RCC_FLAG_LSERDY) == RESET)	//检查指定的RCC标志位设置与否,等待低速晶振就绪
@@ -113,7 +113,7 @@ u8 My_RTC_Init(void)
 		RTC_Set_Time(23,59,56,RTC_H12_AM);	//设置时间
 		RTC_Set_Date(14,5,5,6);		//设置日期
 	 
-		RTC_WriteBackupRegister(RTC_BKP_DR0,0x5050);	//标记已经初始化过了
+		RTC_WriteBackupRegister(RTC_BKP_DR0,0x5153);	//标记已经初始化过了
 	} 
  
 	return 0;
