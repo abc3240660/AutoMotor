@@ -41,49 +41,49 @@ extern __sim7500dev sim7500dev;	//sim900¿ØÖÆÆ÷
 
 #define CMD_DEV_ACK		"Re"// DEV ACK
 
-#define CMD_DEV_REGISTER	"R0"// DEV CMD
-#define CMD_HEART_BEAT		"H0"// DEV CMD
+// F407 Send to Server automatically
+#define CMD_DEV_REGISTER	"R0"// DEV Host
+#define CMD_HEART_BEAT		"H0"// DEV Host
+#define CMD_DOOR_CLOSED		"C1"// DEV Host
+#define CMD_DOOR_OPENED		"O1"// DEV Host
+#define CMD_CALYPSO_UPLOAD	"C3"// DEV Host
+#define CMD_INVALID_MOVE	"W1"// DEV Host
+#define CMD_REPORT_GPS		"L1"// DEV Host
+#define CMD_IAP_SUCCESS		"U1"// DEV Host
+#define CMD_CHARGE_STARTED	"B1"// DEV Host
+#define CMD_CHARGE_STOPED	"B3"// DEV Host
+
+// F407 Recv from Server and Action / ACK
 #define CMD_QUERY_PARAMS	"C0"// DEV ACK
 #define CMD_RING_ALARM		"R2"// DEV ACK
 #define CMD_OPEN_DOOR		"O0"// DEV ACK
-#define CMD_DOOR_CLOSED		"C1"// DEV CMD
-#define CMD_DOOR_OPENED		"O1"// DEV CMD
-#define CMD_CLOSE_DOOR		"G0"// DEV ACK
 #define CMD_JUMP_LAMP		"S2"// DEV ACK
-#define CMD_CALYPSO_UPLOAD	"C3"// DEV CMD
-#define CMD_ENGINE_START	"E0"// DEV CMD
-#define CMD_INVALID_MOVE	"W1"// DEV CMD
-#define CMD_REPORT_GPS		"L1"// DEV CMD
-#define CMD_IAP_SUCCESS		"U1"// DEV CMD
-#define CMD_MP3DW_SUCCESS	"U2"// DEV CMD
-#define CMD_CHARGE_STARTED	"B1"// DEV CMD
-#define CMD_CHARGE_STOPED	"B3"// DEV CMD
-#define CMD_DEV_SHUTDOWN    "B3"// DEV CMD
-#define CMD_QUERY_GPS   	"B3"// DEV CMD
-#define CMD_IAP_REQUEST   	"B3"// DEV CMD
-#define CMD_MP3_UPDATE_REQ  "B3"// DEV CMD
-#define CMD_MP3_PLAY_REQ    "B3"// DEV CMD
-#define CMD_START_TRACE   	"B3"// DEV CMD
-#define CMD_STOP_TRACE   	"B3"// DEV CMD
-#define CMD_QUERY_BMS   	"B3"// DEV CMD
-#define CMD_QUERY_MP3   	"B3"// DEV CMD
+#define CMD_ENGINE_START	"E0"// DEV ACK
+#define CMD_DEV_SHUTDOWN    "S0"// DEV ACK
+#define CMD_QUERY_GPS   	"L0"// DEV ACK
+#define CMD_IAP_UPGRADE   	"U0"// DEV ACK
+#define CMD_MP3_UPDATE  	"U2"// DEV ACK
+#define CMD_MP3_PLAY    	"P0"// DEV ACK
+#define CMD_START_TRACE   	"T0"// DEV ACK
+#define CMD_STOP_TRACE   	"T2"// DEV ACK
+#define CMD_QUERY_BMS   	"B0"// DEV ACK
+#define CMD_QUERY_MP3   	"P2"// DEV ACK
 
-#define LEN_SYS_TIME	32
-#define LEN_IMEI_NO	32
-#define LEN_BAT_VOL	32
-#define LEN_RSSI_VAL	32
-#define LEN_MAX_SEND	32
-#define LEN_MAX_RECV	32
+#define LEN_SYS_TIME    32
+#define LEN_IMEI_NO     32
+#define LEN_BAT_VOL     32
+#define LEN_RSSI_VAL    32
+#define LEN_MAX_SEND    32
+#define LEN_MAX_RECV    32
 
 #define DEBUG_USE 1
 
 enum CMD_TYPE {
 	DEV_REGISTER = 0,
 	HEART_BEAT,
-	INQUIRE_PARAM,
+	QUERY_PARAMS,
 	RING_ALARM,
 	OPEN_DOOR,
-	CLOSE_DOOR,
 	DOOR_CLOSED,
 	DOOR_OPENED,
 	JUMP_LAMP,
@@ -92,14 +92,13 @@ enum CMD_TYPE {
 	INVALID_MOVE,
 	REPORT_GPS,
 	IAP_SUCCESS,
-	MP3DW_SUCCESS,
 	CHARGE_STARTED,
 	CHARGE_STOPED,
 	DEV_SHUTDOWN,
 	QUERY_GPS,
-	IAP_REQUEST,
-	MP3_UPDATE_REQ,
-	MP3_PLAY_REQ,
+	IAP_UPGRADE,
+	MP3_UPDATE,
+	MP3_PLAY,
 	START_TRACE,
 	STOP_TRACE,
 	QUERY_BMS,

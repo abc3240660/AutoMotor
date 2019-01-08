@@ -58,7 +58,7 @@ MP3 Update Request:
    NONE, later ACK
    
 MP3 Play:
->>>"^MOBIT,ECAR,IMEI,P0,file-name,http://xxx/xxx.mp3,file-md5,$\n"
+>>>"^MOBIT,ECAR,IMEI,P0,file-name,$\n"
    "^MOBIT,ECAR,IMEI,Re,P0,file-name,0,$\n" // Play Failed
    "^MOBIT,ECAR,IMEI,Re,P0,file-name,1,$\n" // Play Success
    

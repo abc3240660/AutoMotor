@@ -14,15 +14,33 @@
 // BIT0: 0-Close, 1-Open
 u8 g_door_sta = 0;
 
+u8 g_iap_update = 0;
+u8 g_mp3_iap_update[128] = "";
+
+u8 g_mp3_play = 0;
+u8 g_mp3_name_play[32] = "";
+
+u8 g_mp3_update = 0;
+u8 g_mp3_name_update[128] = "";
+
+// BIT7: 0-idle, 1-changed
+// BIT0: 0-Start, 1-Stop
+u8 g_charge_sta = 0;
+
+u8 g_invaid_move = 0;
+
+// BT(if no BT, use SIM)
+u8 g_mac_addr[32] = "";
+u8 g_iccid_sim[32] = "";
+
 __sim7500dev sim7500dev;	//sim7500控制器
 
 const char* cmd_list[] = {
 	CMD_DEV_REGISTER,
 	CMD_HEART_BEAT,
-	CMD_INQUIRE_PARAM,
+	CMD_QUERY_PARAMS,
 	CMD_RING_ALARM,
 	CMD_OPEN_DOOR,
-	CMD_CLOSE_DOOR,
 	CMD_DOOR_CLOSED,
 	CMD_DOOR_OPENED,
 	CMD_JUMP_LAMP,
@@ -31,14 +49,13 @@ const char* cmd_list[] = {
 	CMD_INVALID_MOVE,
 	CMD_REPORT_GPS,
 	CMD_IAP_SUCCESS,
-	CMD_MP3DW_SUCCESS,
 	CMD_CHARGE_STARTED,
 	CMD_CHARGE_STOPED,
 	CMD_DEV_SHUTDOWN,
 	CMD_QUERY_GPS,
-	CMD_IAP_REQUEST,
-	CMD_MP3_UPDATE_REQ,	
-	CMD_MP3_PLAY_REQ,
+	CMD_IAP_UPGRADE,
+	CMD_MP3_UPDATE,	
+	CMD_MP3_PLAY,
 	CMD_START_TRACE,
 	CMD_STOP_TRACE,
 	CMD_QUERY_BMS,
@@ -72,7 +89,8 @@ int door_state = 0;
 int ring_times = 0;
 int lamp_times = 0;
 int lock_state = 0;
-int hbeat_time = 0;
+int hbeat_time = 6;// default 6s
+int gps_report_gap = 20;// default 10s
 char bat_vol[LEN_BAT_VOL] = "88";// defaut is fake
 char imei[LEN_IMEI_NO] = "88888888";// defaut is fake
 char rssi[LEN_RSSI_VAL] = "88";// defaut is fake
@@ -253,19 +271,6 @@ void sim7500e_do_open_door_ack(char* send)
 }
 
 // DEV ACK
-void sim7500e_do_close_door_ack(char* send)
-{
-	CAN1_CloseDoor();
-
-	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DOOR_CLOSED);
-
-	printf("SEND:%s\n", send);
-	
-	sim7500e_tcp_send(send);
-}
-
-// DEV ACK
 void sim7500e_do_jump_lamp_ack(char* send)
 {
 	CAN1_JumpLamp();
@@ -285,6 +290,130 @@ void sim7500e_do_ring_alarm_ack(char* send)
 
 	memset(send, 0, LEN_MAX_SEND);
 	sprintf(send, "%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_RING_ALARM);
+
+	printf("SEND:%s\n", send);
+	
+	sim7500e_tcp_send(send);
+}
+
+// DEV ACK
+void sim7500e_do_query_params_ack(char* send)
+{
+	memset(send, 0, LEN_MAX_SEND);
+	sprintf(send, "%s,%s,%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_QUERY_PARAMS, g_mac_addr, g_iccid_sim);
+
+	printf("SEND:%s\n", send);
+	
+	sim7500e_tcp_send(send);
+}
+
+// DEV ACK
+void sim7500e_do_start_trace_ack(char* send)
+{
+	memset(send, 0, LEN_MAX_SEND);
+	sprintf(send, "%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_START_TRACE);
+
+	printf("SEND:%s\n", send);
+	
+	sim7500e_tcp_send(send);
+}
+
+// DEV ACK
+void sim7500e_do_stop_trace_ack(char* send)
+{
+	memset(send, 0, LEN_MAX_SEND);
+	sprintf(send, "%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_STOP_TRACE);
+
+	printf("SEND:%s\n", send);
+	
+	sim7500e_tcp_send(send);
+}
+
+// DEV ACK
+void sim7500e_do_dev_shutdown_ack(char* send)
+{
+	// do something power saving
+	// let sim7000e goto sleep
+
+#if 0
+	memset(send, 0, LEN_MAX_SEND);
+	sprintf(send, "%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_DEV_SHUTDOWN);
+
+	printf("SEND:%s\n", send);
+	
+	sim7500e_tcp_send(send);
+#endif
+}
+
+// DEV ACK
+void sim7500e_do_query_gps_ack(char* send)
+{
+	memset(send, 0, LEN_MAX_SEND);
+
+	if (strlen(g_longitude) > 5) {
+		sprintf(send, "%s,%s,%s,%s,%s,%s,%s,0$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_QUERY_GPS, g_longitude, g_latitude);
+	} else {
+		sprintf(send, "%s,%s,%s,%s,%s,F,F,0$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_QUERY_GPS);
+	}
+
+	printf("SEND:%s\n", send);
+	
+	sim7500e_tcp_send(send);
+}
+
+// DEV ACK
+void sim7500e_do_iap_upgrade_ack(char* send)
+{
+	memset(send, 0, LEN_MAX_SEND);
+	sprintf(send, "%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_IAP_UPGRADE);
+
+	printf("SEND:%s\n", send);
+	
+	sim7500e_tcp_send(send);
+
+	// Must stop other send/recv first
+	// Do http get and Flash
+	// Do SoftReset
+}
+
+// DEV ACK
+void sim7500e_do_mp3_play_ack(char* send)
+{
+	u8 filename[64] = "";
+
+	memset(send, 0, LEN_MAX_SEND);
+	sprintf(filename, "0:/MUSIC/%s", g_mp3_name_play);
+
+	if (0 == f_open(&f_txt,(const TCHAR*)filename, FA_READ)) {// existing
+		g_mp3_play = 1;
+		sprintf(send, "%s,%s,%s,%s,%s,%s,1$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_MP3_PLAY, g_mp3_name_play);
+		// Play mp3 in other task
+	} else {// file non-existing
+		g_mp3_play = 0;
+		sprintf(send, "%s,%s,%s,%s,%s,%s,0$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_MP3_PLAY, g_mp3_name_play);
+	}
+
+	printf("SEND:%s\n", send);
+	
+	sim7500e_tcp_send(send);
+}
+
+// DEV ACK
+void sim7500e_do_query_bms_ack(char* send)
+{
+	memset(send, 0, LEN_MAX_SEND);
+	sprintf(send, "%s,%s,%s,%s,%s,%d,%d,%d$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_QUERY_BMS, g_power_percent, g_charge_times, g_bms_temp);
+
+	printf("SEND:%s\n", send);
+	
+	sim7500e_tcp_send(send);
+}
+
+// DEV ACK
+void sim7500e_do_mp3_dw_success_ack(char* send)
+{
+	memset(send, 0, LEN_MAX_SEND);
+	sprintf(send, "%s,%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_MP3_UPDATE, g_mp3_name_update);
 
 	printf("SEND:%s\n", send);
 	
@@ -349,7 +478,7 @@ void sim7500e_do_invalid_moving_report(char* send)
 }
 
 // DEV Auto SEND
-void sim7500e_do_report_gps_auto(char* send)
+void sim7500e_do_gps_location_report(char* send)
 {
 	memset(send, 0, LEN_MAX_SEND);
 
@@ -391,17 +520,6 @@ void sim7500e_do_charge_stop_report(char* send)
 {
 	memset(send, 0, LEN_MAX_SEND);
 	sprintf(send, "%s,%s,%s,%s,%s,%d$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_CHARGE_STOPED, g_power_volume, g_chage_times);
-
-	printf("SEND:%s\n", send);
-	
-	sim7500e_tcp_send(send);
-}
-
-// DEV ACK
-void sim7500e_do_mp3_dw_success_ack(char* send)
-{
-	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_MP3DW_SUCCESS, g_cur_mp3_name);
 
 	printf("SEND:%s\n", send);
 	
@@ -455,8 +573,6 @@ void sim7500e_parse_msg(char* msg, char* send)
 						sim7500e_do_open_door_ack(send);
 					} else if (ENGINE_START == cmd_type) {
 						sim7500e_do_engine_start_ack(send);
-					} else if (CLOSE_DOOR == cmd_type) {
-						sim7500e_do_close_door_ack(send);
 					}
 				} else {
 					// TBD
@@ -475,7 +591,32 @@ void sim7500e_parse_msg(char* msg, char* send)
 					printf("hbeat_time = %d\n", hbeat_time);
 				}
 			} else if (HEART_BEAT == cmd_type) {
-			} else if (INQUIRE_PARAM == cmd_type) {
+			} else if (QUERY_PARAMS == cmd_type) {
+				sim7500e_do_query_params_ack(send);
+			} else if (DEV_SHUTDOWN == cmd_type) {
+				sim7500e_do_dev_shutdown_ack(send);
+			} else if (QUERY_GPS == cmd_type) {
+				sim7500e_do_query_gps_ack(send);
+			} else if (IAP_UPGRADE == cmd_type) {
+				g_iap_update = 1;
+				strcpy(g_iap_name_play, split_str)
+				sim7500e_do_iap_upgrade_ack(send);
+			} else if (QUERY_BMS == cmd_type) {
+				sim7500e_do_query_bms_ack(send);
+			} else if (MP3_PLAY == cmd_type) {
+				strcpy(g_mp3_name_play, split_str)
+				sim7500e_do_mp3_play_ack(send);
+			} else if (MP3_UPDATE == cmd_type) {
+				g_mp3_update = 1;
+				strcpy(g_mp3_name_update, split_str)
+			} else if (START_TRACE == cmd_type) {
+				gps_report_gap = atoi(split_str);
+				printf("gps_report_gap = %d\n", gps_report_gap);
+				sim7500e_do_start_trace_ack(send);
+			} else if (STOP_TRACE == cmd_type) {
+				gps_report_gap = 0;
+				printf("gps_report_gap = %d\n", gps_report_gap);
+				sim7500e_do_stop_trace_ack(send);
 			} else if (RING_ALARM == cmd_type) {
 				ring_times = atoi(split_str);
 				printf("ring_times = %d\n", ring_times);
@@ -499,10 +640,12 @@ void sim7500e_tcp_connect(u8 mode,u8* ipaddr,u8* port)
 	u8 i = 0;
 	u8 *p,*p1,*p2;
 	u16 timex=0;
+	u16 gps_cnt=0;
 	u8 count=0;
 	u8 connectsta=0;			//0,正在连接;1,连接成功;2,连接关闭; 
 	u8 hbeaterrcnt=0;			//心跳错误计数器,连续5次心跳信号无应答,则重新连接
 	u8 oldsta=0XFF;
+	u8 iap_success = 0;
 	p=mymalloc(SRAMIN,100);		//申请100字节内存
 	p1=mymalloc(SRAMIN,100);	//申请100字节内存
 	USART3_RX_STA=0;
@@ -649,6 +792,11 @@ CIPOPEN:
 	if(sim7500e_do_dev_register_auto(send_buf))return;
 	delay_ms(100);
 	delay_ms(100);
+
+	if (iap_success) {
+		sim7500e_do_iap_success_report(send_buf);
+	}
+
 	while(1)
 	{ 
 		if((timex%20)==0)
@@ -673,14 +821,48 @@ CIPOPEN:
 			//if(strstr((const char*)USART3_RX_BUF,"CONNECT OK"))connectsta=1;
 			connectsta=1;
 		}
-		if(connectsta==1&&g_door_sta&0X80)// Door Changed
-			if (g_door_sta&0x01) {// OPEN
-				sim7500e_do_door_opened_report(send_buf);
-			} else {// CLOSE
-				sim7500e_do_door_closed_report(send_buf);
+
+		// How to avoid can't receive last ack from server
+		// Must start after receive last ack from server
+		if(connectsta==1&&hbeaterrcnt==0) {
+			if (g_door_sta&0x80) {// Door Changed
+				if (g_door_sta&0x01) {// OPEN
+					sim7500e_do_door_opened_report(send_buf);
+				} else {// CLOSE
+					sim7500e_do_door_closed_report(send_buf);
+				}
+				g_door_sta &= 0x7F;
+			}
+			if (g_charge_sta&0x80) {// Charge Changed
+				if (g_charge_sta&0x01) {// Start
+					sim7500e_do_charge_start_report(send_buf);
+				} else {// Stop
+					sim7500e_do_charge_stop_report(send_buf);
+				}
+				g_charge_sta &= 0x7F;
+			}
+			if (g_invaid_move) {
+				sim7500e_do_invalid_moving_report(send_buf);
+			}
+			if (gps_report_gap) {
+				// every loop delay 10ms
+				if(0 == gps_cnt%(gps_report_gap*100)) {
+					gps_cnt = 0;
+					sim7500e_do_gps_location_report(send_buf);
+				}
+				gps_cnt++;
+			} else {
+				gps_cnt = 0;
+			}
+			if (g_mp3_update) {
+				// do http get
+			}
+			if (g_iap_update) {
+				// do http get
 			}
 		}
-		if(connectsta==1&&timex>=600)//连接正常的时候,每6秒发送一次心跳
+		// every loop delay 10ms
+		if(connectsta==1&&timex>=(hbeat_time*100))//连接正常的时候,每6秒发送一次心跳
 		{
 			timex=0;
 			
