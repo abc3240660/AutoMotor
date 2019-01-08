@@ -117,6 +117,52 @@ void uart_init(u32 bound){
 	
 }
 
+#define SET_GPS_GAP "SET-GPS-GAP="
+#define SET_HBEAT_GAP "SET-HBEAT-GAP="
+#define TRIG_DOOR_OPENED "TRIG-DOOR-OPENED"
+#define TRIG_DOOR_CLOSED "TRIG-DOOR-CLOSED"
+#define TRIG_INVALID_MOVE "TRIG-INVALID-MOVE"
+#define TRIG_CHARGE_STARTED "TRIG-CHARGE-STARTED"
+#define TRIG_CHARGE_STOPED "TRIG-CHARGE-STOPED"
+#define PLAY_MP3_MUSIC "PLAY-MP3="
+
+extern int hbeat_time;
+extern u8 g_door_sta;
+extern u8 g_invaid_move;
+extern u8 g_charge_sta;
+extern u8 g_mp3_play;
+extern u8 g_mp3_name_play[32];
+
+void debug_process(void)
+{
+	if (0 == strncmp(USART_RX_BUF, SET_GPS_GAP, strlen(SET_GPS_GAP))) {
+		hbeat_time = atoi(USART_RX_BUF+strlen(SET_GPS_GAP));
+	} else if (0 == strncmp(USART_RX_BUF, SET_HBEAT_GAP, strlen(SET_HBEAT_GAP))) {
+		gps_report_gap = atoi(USART_RX_BUF+strlen(SET_HBEAT_GAP));
+	} else if (0 == strncmp(USART_RX_BUF, TRIG_DOOR_OPENED, strlen(TRIG_DOOR_OPENED))) {
+		g_door_sta = 1;
+		g_door_sta |= 0x80; 
+	} else if (0 == strncmp(USART_RX_BUF, TRIG_DOOR_CLOSED, strlen(TRIG_DOOR_CLOSED))) {
+		g_door_sta = 0;
+		g_door_sta |= 0x80; 
+	} else if (0 == strncmp(USART_RX_BUF, TRIG_INVALID_MOVE, strlen(TRIG_INVALID_MOVE))) {
+		g_invaid_move = 1;
+	} else if (0 == strncmp(USART_RX_BUF, TRIG_CHARGE_STARTED, strlen(TRIG_CHARGE_STARTED))) {
+		g_charge_sta = 1;
+		g_charge_sta |= 0x80; 
+	} else if (0 == strncmp(USART_RX_BUF, TRIG_CHARGE_STOPED, strlen(TRIG_CHARGE_STOPED))) {
+		g_charge_sta = 0;
+		g_charge_sta |= 0x80; 
+	} else if (0 == strncmp(USART_RX_BUF, PLAY_MP3_MUSIC, strlen(PLAY_MP3_MUSIC))) {
+		memset(g_mp3_name_play, 0, 32);
+		strcpy(g_mp3_name_play, USART_RX_BUF+strlen(PLAY_MP3_MUSIC));
+		// printf("g_mp3_name_play = %s\n", g_mp3_name_play);
+
+		g_mp3_play = 1;
+	}
+
+	USART_RX_STA = 0;
+}
 
 void USART1_IRQHandler(void)                	//串口1中断服务程序
 {
@@ -133,7 +179,10 @@ void USART1_IRQHandler(void)                	//串口1中断服务程序
 			if(USART_RX_STA&0x4000)//接收到了0x0d
 			{
 				if(Res!=0x0a)USART_RX_STA=0;//接收错误,重新开始
-				else USART_RX_STA|=0x8000;	//接收完成了 
+				else {
+					USART_RX_STA|=0x8000;	//接收完成了 
+					debug_process();
+				}
 			}
 			else //还没收到0X0D
 			{	
