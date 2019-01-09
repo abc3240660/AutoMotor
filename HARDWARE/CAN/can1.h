@@ -21,8 +21,8 @@ u8 CAN1_StopEngine(void);
 u8 CAN1_OpenDoor(void);
 u8 CAN1_CloseDoor(void);
 
-u8 CAN1_JumpLamp(void);
-u8 CAN1_RingAlarm(void);
+u8 CAN1_JumpLamp(u8 times);
+u8 CAN1_RingAlarm(u8 times);
 
 u8 CAN1_OneKeyStart(void);
 

@@ -45,8 +45,8 @@ extern __sim7500dev sim7500dev;	//sim900¿ØÖÆÆ÷
 // F407 Send to Server automatically
 #define CMD_DEV_REGISTER	"R0"// DEV Host
 #define CMD_HEART_BEAT		"H0"// DEV Host
-#define CMD_DOOR_CLOSED		"C1"// DEV Host
-#define CMD_DOOR_OPENED		"O1"// DEV Host
+#define CMD_DOOR_LOCKED		"C1"// DEV Host
+#define CMD_DOOR_UNLOCKED		"O1"// DEV Host
 #define CMD_CALYPSO_UPLOAD	"C3"// DEV Host
 #define CMD_INVALID_MOVE	"W1"// DEV Host
 #define CMD_REPORT_GPS		"L1"// DEV Host
@@ -57,7 +57,7 @@ extern __sim7500dev sim7500dev;	//sim900¿ØÖÆÆ÷
 // F407 Recv from Server and Action / ACK
 #define CMD_QUERY_PARAMS	"C0"// DEV ACK
 #define CMD_RING_ALARM		"R2"// DEV ACK
-#define CMD_OPEN_DOOR		"O0"// DEV ACK
+#define CMD_UNLOCK_DOOR		"O0"// DEV ACK
 #define CMD_JUMP_LAMP		"S2"// DEV ACK
 #define CMD_ENGINE_START	"E0"// DEV ACK
 #define CMD_DEV_SHUTDOWN    "S0"// DEV ACK
@@ -84,9 +84,9 @@ enum CMD_TYPE {
 	HEART_BEAT,
 	QUERY_PARAMS,
 	RING_ALARM,
-	OPEN_DOOR,
-	DOOR_CLOSED,
-	DOOR_OPENED,
+	UNLOCK_DOOR,
+	DOOR_LOCKED,
+	DOOR_UNLOCKED,
 	JUMP_LAMP,
 	CALYPSO_UPLOAD,
 	ENGINE_START,

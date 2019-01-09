@@ -1,11 +1,13 @@
 #include "can2.h"
 #include "led.h"
 
-u8 g_bms_charging = 0;
-u8 g_bms_temp_max = 30;// 30
-u8 g_bms_temp_min = 30;// 30
-u8 g_bms_vol_percent = 80;// 50%
-u8 g_bms_charged_times = 0;// Save into ExFlash
+// BIT7: 0-idle, 1-changed
+// BIT0: 0-Start, 1-Stop
+extern u8 g_bms_charge_sta;
+extern u8 g_bms_temp_max;// 30
+extern u8 g_bms_temp_min;// 30
+extern u8 g_bms_vol_percent;// 50%
+extern u8 g_bms_charged_times;// Save into ExFlash
 /****************************************************************************
 * 名    称: u8 CAN2_Mode_Init(u8 mode)
 * 功    能：CAN初始化
@@ -142,16 +144,17 @@ u8 CAN2_Receive_Msg(u8 *buf)
 
 		if (0x18FF28F4 == RxMessage.ExtId) {
 			if (0x02 == (RxMessage.Data[0]&0x2)) {// battery charging
-				if (0 == g_bms_charging) {
-					g_bms_charging = 1;
+				if (0 == g_bms_charge_sta) {
+					g_bms_charge_sta = 1;
 					g_bms_charged_times++;
 				}
 			} else {
-				if (1 == g_bms_charging) {
-					g_bms_charging = 0;
+				if (1 == g_bms_charge_sta) {
+					g_bms_charge_sta = 0;
 				}
 			}
 			
+			g_bms_charge_sta |= 0x80;
 			g_bms_vol_percent = RxMessage.Data[1];
 		} else if (0x18FE28F4 == RxMessage.ExtId) {
 			g_bms_temp_max = RxMessage.Data[4];

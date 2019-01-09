@@ -10,9 +10,17 @@
 #include "can1.h"
 #include "rfid.h"
 
+
+// LOCK Sta:
 // BIT7: 0-idle, 1-changed
 // BIT0: 0-Close, 1-Open
-u8 g_door_sta = 0;
+u8 g_door_lock_sta = 0;
+
+// DOOR Sta:
+u8 g_door_state = 0;
+
+// ECAR ON12V:
+u8 g_power_state = 0;
 
 u8 g_iap_update = 0;
 u8 g_iap_update_name[128] = "";
@@ -25,7 +33,7 @@ u8 g_mp3_name_update[128] = "";
 
 // BIT7: 0-idle, 1-changed
 // BIT0: 0-Start, 1-Stop
-u8 g_charge_sta = 0;
+u8 g_bms_charge_sta = 0;
 
 u8 g_invaid_move = 0;
 
@@ -34,17 +42,17 @@ u8 g_mac_addr[32] = "";
 u8 g_iccid_sim[32] = "";
 u8 g_sw_version[32] = "";
 
-extern u8 g_bms_charging;
-extern u8 g_bms_temp_max;// 30
-extern u8 g_bms_temp_min;// 30
-extern u8 g_bms_vol_percent;// 50%
-extern u8 g_bms_charged_times;// Save into ExFlash
+u8 g_bms_temp_max = 30;// 30
+u8 g_bms_temp_min = 30;// 30
+u8 g_bms_vol_percent = 80;// 50%
+u8 g_bms_charged_times = 0;// Save into ExFlash
 
-u8 dat1[32] = "";
-u8 dat2[32] = "";
-u8 dat3[32] = "";
-u8 dat4[32] = "";
-u8 dat5[32] = "";
+u8 gps_dat1[32] = "";
+u8 gps_dat2[32] = "";
+u8 gps_dat3[32] = "";
+u8 gps_dat4[32] = "";
+u8 gps_dat5[32] = "";
+
 u8 USART3_RX_BUF_BAK[USART3_MAX_RECV_LEN];
 
 void SoftReset(void);
@@ -57,9 +65,9 @@ const char* cmd_list[] = {
 	CMD_HEART_BEAT,
 	CMD_QUERY_PARAMS,
 	CMD_RING_ALARM,
-	CMD_OPEN_DOOR,
-	CMD_DOOR_CLOSED,
-	CMD_DOOR_OPENED,
+	CMD_UNLOCK_DOOR,
+	CMD_DOOR_LOCKED,
+	CMD_DOOR_UNLOCKED,
 	CMD_JUMP_LAMP,
 	CMD_CALYPSO_UPLOAD,
 	CMD_ENGINE_START,
@@ -99,15 +107,12 @@ char recv_buf[LEN_MAX_RECV] = "";
 
 char sync_sys_time[LEN_SYS_TIME+1] = "";
 
-u8 tcp_net_ok = 0;
+static u8 g_ring_times = 0;
+static u8 g_lamp_times = 0;
 
-int power_state = 0;
-int door_state = 0;
-int ring_times = 0;
-int lamp_times = 0;
-int lock_state = 0;
-int hbeat_time = 6;// default 6s
-int gps_report_gap = 20;// default 10s
+u8 lock_state = 0;
+u8 hbeat_time = 6;// default 6s
+u8 gps_report_gap = 20;// default 10s
 char bat_vol[LEN_BAT_VOL] = "88";// defaut is fake
 char imei[LEN_IMEI_NO] = "88888888";// defaut is fake
 char rssi[LEN_RSSI_VAL] = "88";// defaut is fake
@@ -202,13 +207,24 @@ u8 sim7500e_imei_check(void)
 
 u8 sim7500e_gps_check(void)
 {
-	sscanf((const char*)USART3_RX_BUF_BAK, "%[^,],%[^,],%[^,],%[^,],%[^,]", dat1,dat2,dat3,dat4,dat5);
+	memset(gps_dat4, 0, 32);
+	memset(gps_dat5, 0, 32);
+	sscanf((const char*)USART3_RX_BUF_BAK, "%[^,],%[^,],%[^,],%[^,],%[^,]", gps_dat1, gps_dat2, gps_dat3, gps_dat4, gps_dat5);
 	
 	// 如果中途SIM7000E断电重启，那么是有回显的
 	// 判断GPS PWR是否因为异常断电导致被关闭了
 	// Exception Process
 	
-	printf("GPS Latitude(%s), Longitude(%s)\n", dat4, dat5);
+	memset(g_latitude, 0, 32);
+	memset(g_longitude, 0, 32);
+	if (strlen(gps_dat4) > 5) {
+		strcpy(g_latitude, gps_dat4);
+		strcpy(g_longitude, gps_dat5);
+		printf("GPS Latitude(%s), Longitude(%s)\n", gps_dat4, gps_dat5);
+	} else {
+		printf("Get GPS Nothing...\n");
+	}
+	
 	
 	return 1;// OK
 }
@@ -305,7 +321,7 @@ void sim7500e_do_engine_start_ack(char* send)
 	CAN1_StartEngine();
 
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s,%s,%d$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_ENGINE_START, power_state);
+	sprintf(send, "%s,%s,%s,%s,%s,%d$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_ENGINE_START, g_power_state);
 
 	printf("SEND:%s\n", send);
 	
@@ -318,7 +334,7 @@ void sim7500e_do_open_door_ack(char* send)
 	CAN1_OpenDoor();
 
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s,%s,%d$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_OPEN_DOOR, door_state);
+	sprintf(send, "%s,%s,%s,%s,%s,%d$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_UNLOCK_DOOR, g_door_state);
 
 	printf("SEND:%s\n", send);
 	
@@ -328,7 +344,7 @@ void sim7500e_do_open_door_ack(char* send)
 // DEV ACK
 void sim7500e_do_jump_lamp_ack(char* send)
 {
-	CAN1_JumpLamp();
+	CAN1_JumpLamp(g_lamp_times);
 
 	memset(send, 0, LEN_MAX_SEND);
 	sprintf(send, "%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_JUMP_LAMP);
@@ -341,7 +357,7 @@ void sim7500e_do_jump_lamp_ack(char* send)
 // DEV ACK
 void sim7500e_do_ring_alarm_ack(char* send)
 {
-	CAN1_RingAlarm();
+	CAN1_RingAlarm(g_ring_times);
 
 	memset(send, 0, LEN_MAX_SEND);
 	sprintf(send, "%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_RING_ALARM);
@@ -504,7 +520,7 @@ void sim7500e_do_heart_beat_auto(char* send)
 void sim7500e_do_door_closed_report(char* send)
 {
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DOOR_CLOSED);
+	sprintf(send, "%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DOOR_LOCKED);
 
 	printf("SEND:%s\n", send);
 	
@@ -515,7 +531,7 @@ void sim7500e_do_door_closed_report(char* send)
 void sim7500e_do_door_opened_report(char* send)
 {
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DOOR_OPENED);
+	sprintf(send, "%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DOOR_UNLOCKED);
 
 	printf("SEND:%s\n", send);
 	
@@ -625,7 +641,7 @@ void sim7500e_parse_msg(char* msg, char* send)
 						printf("data_pos = %d, cmd_type = %d\n", data_pos, cmd_type);
 					}
 					
-					if (OPEN_DOOR == cmd_type) {
+					if (UNLOCK_DOOR == cmd_type) {
 						sim7500e_do_open_door_ack(send);
 					} else if (ENGINE_START == cmd_type) {
 						sim7500e_do_engine_start_ack(send);
@@ -674,12 +690,12 @@ void sim7500e_parse_msg(char* msg, char* send)
 				printf("gps_report_gap = %d\n", gps_report_gap);
 				sim7500e_do_stop_trace_ack(send);
 			} else if (RING_ALARM == cmd_type) {
-				ring_times = atoi(split_str);
-				printf("ring_times = %d\n", ring_times);
+				g_ring_times = atoi(split_str);
+				printf("g_ring_times = %d\n", g_ring_times);
 				sim7500e_do_ring_alarm_ack(send);
 			} else if (JUMP_LAMP == cmd_type) {
-				lamp_times = atoi(split_str);
-				printf("lamp_times = %d\n", lamp_times);
+				g_lamp_times = atoi(split_str);
+				printf("g_lamp_times = %d\n", g_lamp_times);
 				sim7500e_do_jump_lamp_ack(send);
 			}
 		}
@@ -831,7 +847,50 @@ void sim7500e_tcp_connect(u8 mode,u8* ipaddr,u8* port)
 			if(strstr((const char*)USART3_RX_BUF_BAK,"CONNECT OK"))connectsta=1;
 			connectsta=1;
 		}
-		if(connectsta==1&&timex>=600)//连接正常的时候,每6秒发送一次心跳
+
+		// How to avoid can't receive last ack from server
+		// Must start after receive last ack from server
+		// hbeaterrcnt==0 -> last ack have received
+		if(connectsta==1&&hbeaterrcnt==0) {
+			if (g_door_lock_sta&0x80) {// Door Changed
+				if (g_door_lock_sta&0x01) {// OPEN
+					sim7500e_do_door_opened_report(send_buf);
+				} else {// CLOSE
+					sim7500e_do_door_closed_report(send_buf);
+				}
+				g_door_lock_sta &= 0x7F;
+			}
+			if (g_bms_charge_sta&0x80) {// Charge Changed
+				if (g_bms_charge_sta&0x01) {// Start
+					sim7500e_do_charge_start_report(send_buf);
+				} else {// Stop
+					sim7500e_do_charge_stop_report(send_buf);
+				}
+				g_bms_charge_sta &= 0x7F;
+			}
+			if (g_invaid_move) {
+				sim7500e_do_invalid_moving_report(send_buf);
+			}
+			if (gps_report_gap) {
+				// every loop delay 10ms
+				if(0 == gps_cnt%(gps_report_gap*100)) {
+					gps_cnt = 0;
+					sim7500e_do_gps_location_report(send_buf);
+				}
+				gps_cnt++;
+			} else {
+				gps_cnt = 0;
+			}
+			if (g_mp3_update) {
+				// do http get
+			}
+			if (g_iap_update) {
+				// do http get
+			}
+		}
+
+		// every loop delay 10ms
+		if(connectsta==1&&timex>=(hbeat_time*100))//连接正常的时候,每6秒发送一次心跳
 		{
 			timex=0;
 			
@@ -886,22 +945,6 @@ void sim7500e_tcp_connect(u8 mode,u8* ipaddr,u8* port)
 			oldsta=connectsta;
 		} 
 		timex++; 
-		gps_cnt++;
-		
-		if (0 == (gps_cnt%300)) {
-			sim7500e_send_cmd("AT+CGNSINF","OK",40);
-			sim7500e_gps_check();
-			
-			printf("test02\n");
-		}
-		
-		if (30000 == gps_cnt) {
-			gps_cnt = 1;
-		}
-//		if (20000 == gps_cnt) {
-//			printf("gps_cnt = 20000 SoftReset\n");
-//			SoftReset();
-//		}
 	}
 	
 	myfree(SRAMIN,p);
