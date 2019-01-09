@@ -761,7 +761,7 @@ void sim7500e_tcp_connect(u8 mode,u8* ipaddr,u8* port)
 	sim7500e_send_cmd("AT+CIFSR",0,40);
 	delay_ms(100);
 	
-	CAN1_JumpLamp();
+	// CAN1_JumpLamp(g_lamp_times);
 
 	LED1 = 1;
 	LED2 = 1;
