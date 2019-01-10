@@ -75,7 +75,7 @@ void mp3_play(const char* mp3name)
 	}	  	 		  	    
 }
 
-void music_play(void)
+void music_play(const char* mp3name)
 {
 	VS_HD_Reset();
 	VS_Soft_Reset();

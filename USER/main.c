@@ -22,6 +22,11 @@ __align(8) static OS_STK START_TASK_STK[START_STK_SIZE];
 //任务函数
 void start_task(void *pdata);	
  			   
+#define LOWER_TASK_PRIO       			7
+#define LOWER_STK_SIZE  		    	128
+__align(8) static OS_STK LOWER_TASK_STK[LOWER_STK_SIZE];
+void lower_task(void *pdata);	
+
 //串口任务
 //设置任务优先级
 #define USART_TASK_PRIO       			7 
@@ -44,13 +49,13 @@ void main_task(void *pdata);
 
 //监视任务
 //设置任务优先级
-#define WATCH_TASK_PRIO       			3 
+#define HIGHER_TASK_PRIO       			3 
 //设置任务堆栈大小
-#define WATCH_STK_SIZE  		   		256
+#define HIGHER_STK_SIZE  		   		256
 //任务堆栈，8字节对齐	
-__align(8) static OS_STK WATCH_TASK_STK[WATCH_STK_SIZE];
+__align(8) static OS_STK HIGHER_TASK_STK[HIGHER_STK_SIZE];
 //任务函数
-void watch_task(void *pdata);
+void higher_task(void *pdata);
 //////////////////////////////////////////////////////////////////////////////	 
 
 int total_ms=0;
@@ -63,6 +68,9 @@ u8 g_logmsg[256] = "";
 
 void create_logfile(void);
 void write_logs(char *module, char *log, u16 size, u8 mode);
+
+u8 g_mp3_play = 0;
+u8 g_mp3_play_name[32] = "";
 //////////////////////////////////////////////////////////////////////////////	 
 
 //系统初始化
@@ -177,22 +185,36 @@ void start_task(void *pdata)
 	OS_ENTER_CRITICAL();//进入临界区(无法被中断打断)    
  	OSTaskCreate(main_task,(void *)0,(OS_STK*)&MAIN_TASK_STK[MAIN_STK_SIZE-1],MAIN_TASK_PRIO);						   
  	OSTaskCreate(usart_task,(void *)0,(OS_STK*)&USART_TASK_STK[USART_STK_SIZE-1],USART_TASK_PRIO);						   
-	OSTaskCreate(watch_task,(void *)0,(OS_STK*)&WATCH_TASK_STK[WATCH_STK_SIZE-1],WATCH_TASK_PRIO); 					   
+	OSTaskCreate(higher_task,(void *)0,(OS_STK*)&HIGHER_TASK_STK[HIGHER_STK_SIZE-1],HIGHER_TASK_PRIO); 					   
+	OSTaskCreate(lower_task,(void *)0,(OS_STK*)&LOWER_TASK_STK[LOWER_STK_SIZE-1],LOWER_TASK_PRIO); 					   
 	OSTaskSuspend(START_TASK_PRIO);	//挂起起始任务.
 	OS_EXIT_CRITICAL();	//退出临界区(可以被中断打断)
 } 
-	
-//主任务
+
+// Play MP3 task
+void lower_task(void *pdata)
+{
+	while(1) {
+		if (g_mp3_play) {
+			music_play((const char*)g_mp3_play_name);
+
+			g_mp3_play = 0;
+			memset(g_mp3_play, 0, 32);
+		}
+
+    	OSTimeDlyHMSM(0,0,0,500);// 500ms
+	}
+}
+
+// MPU6050 Check and BT Data Parse
 void main_task(void *pdata)
 {
-//	while(1) {
-//		u3_printf("Hello Uart3 TTL\n");
-//		sim900a_send_cmd("AT","OK",100);
-//		delay_ms(1000);
-//	}
-	sim7500e_tcp_connect(0,NULL,NULL);
-//	delay_ms(5000);
-//	cpr74_read_calypso();
+	while(1) {
+		// TBD: Add MPU6050 Check
+		// TBD: Add Invalid Moving Check
+		// TBD: Add BT Data Parse
+    	OSTimeDlyHMSM(0,0,0,500);// 500ms
+	}
 }
 
 void create_logfile(void)
@@ -257,52 +279,33 @@ void write_logs(char *module, char *log, u16 size, u8 mode)
 	}
 }
 
-//执行最不需要时效性的代码
+// READ RFID and other task
 void usart_task(void *pdata)
 {
+	u8 loop_cnt = 0;
+
 	while(1) {
-		delay_ms(3000);
 		if((UART5_RX_STA&(1<<15)) != 0) {
 			cpr74_read_calypso();
 			UART5_RX_STA = 0;
 		}
 		
-		printf("Hall Counter = %d\n", pluse_num_new);
+		if (loop_cnt++ == 3) {
+			loop_cnt = 0;
+			printf("Hall Counter = %d\n", pluse_num_new);
+		}
+
+    	OSTimeDlyHMSM(0,0,0,500);// 500ms
+    	OSTimeDlyHMSM(0,0,0,500);// 500ms
 	}
 }
 
 //监视任务
-void watch_task(void *pdata)
+void higher_task(void *pdata)
 {
-	u8 key;
-	
-	while(1)
-	{
-		// TBD to check Why
-		// Only K3(=WKUP) is useful
-		key=KEY_Scan(0);
-	  if(key)
-		{						   
-			switch(key)
-			{				 
-				case WKUP_PRES:
-					LED0=!LED0;
-					LEDX=!LEDX;
-					break;
-				case KEY0_PRES:
-					LED0=!LED0;
-					LEDX=!LEDX;
-					break;
-				case KEY1_PRES:
-					LED1=!LED1;
-					break;
-				case KEY2_PRES:
-					LED0=!LED0;
-					LED1=!LED1;
-					break;
-			}
-		}else delay_ms(10);
-    OSTimeDlyHMSM(0,0,0,10);
+	while (1) {
+		sim7500e_tcp_connect(0,NULL,NULL);
+    	OSTimeDlyHMSM(0,0,0,500);// 500ms
 	}
 }
 

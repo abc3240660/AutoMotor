@@ -9,7 +9,7 @@
 #include "ucos_ii.h" 
 #include "can1.h"
 #include "rfid.h"
-
+#include "MP3PLAY.H"
 
 // LOCK Sta:
 // BIT7: 0-idle, 1-changed
@@ -25,9 +25,6 @@ u8 g_power_state = 0;
 u8 g_iap_update = 0;
 u8 g_iap_update_name[128] = "";
 
-u8 g_mp3_play = 0;
-u8 g_mp3_name_play[32] = "";
-
 u8 g_mp3_update = 0;
 u8 g_mp3_name_update[128] = "";
 
@@ -36,6 +33,8 @@ u8 g_mp3_name_update[128] = "";
 u8 g_bms_charge_sta = 0;
 
 u8 g_invaid_move = 0;
+
+u8 g_calypso_active = 0;
 
 // BT(if no BT, use SIM)
 u8 g_mac_addr[32] = "";
@@ -57,6 +56,11 @@ u8 USART3_RX_BUF_BAK[USART3_MAX_RECV_LEN];
 
 void SoftReset(void);
 void write_logs(char *module, char *log, u16 size, u8 mode);
+
+extern u8 g_mp3_play;
+extern u8 g_mp3_play_name[32];
+extern u8 g_calypso_card_id[CARD_ID_SIZE+1];
+extern u8 g_calypso_serial_num[SERIAL_NUM_SIZE+1];
 
 __sim7500dev sim7500dev;	//sim7500控制器
 
@@ -110,11 +114,11 @@ char sync_sys_time[LEN_SYS_TIME+1] = "";
 static u8 g_ring_times = 0;
 static u8 g_lamp_times = 0;
 
-u8 lock_state = 0;
 u8 hbeat_time = 6;// default 6s
 u8 gps_report_gap = 20;// default 10s
+
+// TBD: need to be replace
 char bat_vol[LEN_BAT_VOL] = "88";// defaut is fake
-char imei[LEN_IMEI_NO] = "88888888";// defaut is fake
 char rssi[LEN_RSSI_VAL] = "88";// defaut is fake
 char dev_time[LEN_SYS_TIME] = "20181105151955";// defaut is fake
 
@@ -321,7 +325,7 @@ void sim7500e_do_engine_start_ack(char* send)
 	CAN1_StartEngine();
 
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s,%s,%d$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_ENGINE_START, g_power_state);
+	sprintf(send, "%s,%s,%s,%s,%s,%d$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_DEV_ACK, CMD_ENGINE_START, g_power_state);
 
 	printf("SEND:%s\n", send);
 	
@@ -334,7 +338,7 @@ void sim7500e_do_open_door_ack(char* send)
 	CAN1_OpenDoor();
 
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s,%s,%d$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_UNLOCK_DOOR, g_door_state);
+	sprintf(send, "%s,%s,%s,%s,%s,%d$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_DEV_ACK, CMD_UNLOCK_DOOR, g_door_state);
 
 	printf("SEND:%s\n", send);
 	
@@ -347,7 +351,7 @@ void sim7500e_do_jump_lamp_ack(char* send)
 	CAN1_JumpLamp(g_lamp_times);
 
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_JUMP_LAMP);
+	sprintf(send, "%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_DEV_ACK, CMD_JUMP_LAMP);
 
 	printf("SEND:%s\n", send);
 	
@@ -360,7 +364,7 @@ void sim7500e_do_ring_alarm_ack(char* send)
 	CAN1_RingAlarm(g_ring_times);
 
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_RING_ALARM);
+	sprintf(send, "%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_DEV_ACK, CMD_RING_ALARM);
 
 	printf("SEND:%s\n", send);
 	
@@ -371,7 +375,7 @@ void sim7500e_do_ring_alarm_ack(char* send)
 void sim7500e_do_query_params_ack(char* send)
 {
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_QUERY_PARAMS, g_mac_addr, g_iccid_sim);
+	sprintf(send, "%s,%s,%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_DEV_ACK, CMD_QUERY_PARAMS, g_mac_addr, g_iccid_sim);
 
 	printf("SEND:%s\n", send);
 	
@@ -382,7 +386,7 @@ void sim7500e_do_query_params_ack(char* send)
 void sim7500e_do_start_trace_ack(char* send)
 {
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_START_TRACE);
+	sprintf(send, "%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_DEV_ACK, CMD_START_TRACE);
 
 	printf("SEND:%s\n", send);
 	
@@ -393,7 +397,7 @@ void sim7500e_do_start_trace_ack(char* send)
 void sim7500e_do_stop_trace_ack(char* send)
 {
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_STOP_TRACE);
+	sprintf(send, "%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_DEV_ACK, CMD_STOP_TRACE);
 
 	printf("SEND:%s\n", send);
 	
@@ -408,7 +412,7 @@ void sim7500e_do_dev_shutdown_ack(char* send)
 
 #if 0
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_DEV_SHUTDOWN);
+	sprintf(send, "%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_DEV_ACK, CMD_DEV_SHUTDOWN);
 
 	printf("SEND:%s\n", send);
 	
@@ -422,9 +426,9 @@ void sim7500e_do_query_gps_ack(char* send)
 	memset(send, 0, LEN_MAX_SEND);
 
 	if (strlen((const char*)g_longitude) > 5) {
-		sprintf(send, "%s,%s,%s,%s,%s,%s,%s,0$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_QUERY_GPS, g_longitude, g_latitude);
+		sprintf(send, "%s,%s,%s,%s,%s,%s,%s,0$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_DEV_ACK, CMD_QUERY_GPS, g_longitude, g_latitude);
 	} else {
-		sprintf(send, "%s,%s,%s,%s,%s,F,F,0$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_QUERY_GPS);
+		sprintf(send, "%s,%s,%s,%s,%s,F,F,0$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_DEV_ACK, CMD_QUERY_GPS);
 	}
 
 	printf("SEND:%s\n", send);
@@ -436,7 +440,7 @@ void sim7500e_do_query_gps_ack(char* send)
 void sim7500e_do_iap_upgrade_ack(char* send)
 {
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_IAP_UPGRADE);
+	sprintf(send, "%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_DEV_ACK, CMD_IAP_UPGRADE);
 
 	printf("SEND:%s\n", send);
 	
@@ -454,15 +458,15 @@ void sim7500e_do_mp3_play_ack(char* send)
 	char filename[64] = "";
 
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(filename, "0:/MUSIC/%s", g_mp3_name_play);
+	sprintf(filename, "0:/MUSIC/%s", g_mp3_play_name);
 
 	if (0 == f_open(&f_txt,(const TCHAR*)filename, FA_READ)) {// existing
 		g_mp3_play = 1;
-		sprintf(send, "%s,%s,%s,%s,%s,%s,1$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_MP3_PLAY, g_mp3_name_play);
+		sprintf(send, "%s,%s,%s,%s,%s,%s,1$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_DEV_ACK, CMD_MP3_PLAY, g_mp3_play_name);
 		// Play mp3 in other task
 	} else {// file non-existing
 		g_mp3_play = 0;
-		sprintf(send, "%s,%s,%s,%s,%s,%s,0$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_MP3_PLAY, g_mp3_name_play);
+		sprintf(send, "%s,%s,%s,%s,%s,%s,0$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_DEV_ACK, CMD_MP3_PLAY, g_mp3_play_name);
 	}
 
 	printf("SEND:%s\n", send);
@@ -474,7 +478,7 @@ void sim7500e_do_mp3_play_ack(char* send)
 void sim7500e_do_query_bms_ack(char* send)
 {
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s,%s,%d,%d,%d$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_QUERY_BMS, g_bms_vol_percent, g_bms_charged_times, g_bms_temp_max);
+	sprintf(send, "%s,%s,%s,%s,%s,%d,%d,%d$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_DEV_ACK, CMD_QUERY_BMS, g_bms_vol_percent, g_bms_charged_times, g_bms_temp_max);
 
 	printf("SEND:%s\n", send);
 	
@@ -485,7 +489,7 @@ void sim7500e_do_query_bms_ack(char* send)
 void sim7500e_do_mp3_dw_success_ack(char* send)
 {
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_ACK, CMD_MP3_UPDATE, g_mp3_name_update);
+	sprintf(send, "%s,%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_DEV_ACK, CMD_MP3_UPDATE, g_mp3_name_update);
 
 	printf("SEND:%s\n", send);
 	
@@ -496,7 +500,7 @@ void sim7500e_do_mp3_dw_success_ack(char* send)
 u8 sim7500e_do_dev_register_auto(char* send)
 {
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DEV_REGISTER, HW_VERSION, SW_VERSION, bat_vol);
+	sprintf(send, "%s,%s,%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_DEV_REGISTER, HW_VERSION, SW_VERSION, bat_vol);
 
 	printf("SEND:%s\n", send);
 	
@@ -509,7 +513,7 @@ u8 sim7500e_do_dev_register_auto(char* send)
 void sim7500e_do_heart_beat_auto(char* send)
 {
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s,%s,%d,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_HEART_BEAT, dev_time, lock_state, rssi, bat_vol);
+	sprintf(send, "%s,%s,%s,%s,%s,%d,%s,%s$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_HEART_BEAT, dev_time, (g_door_lock_sta&0x7F), rssi, bat_vol);
 	
 	printf("SEND:%s\n", send);
 	
@@ -520,7 +524,7 @@ void sim7500e_do_heart_beat_auto(char* send)
 void sim7500e_do_door_closed_report(char* send)
 {
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DOOR_LOCKED);
+	sprintf(send, "%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_DOOR_LOCKED);
 
 	printf("SEND:%s\n", send);
 	
@@ -531,7 +535,7 @@ void sim7500e_do_door_closed_report(char* send)
 void sim7500e_do_door_opened_report(char* send)
 {
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_DOOR_UNLOCKED);
+	sprintf(send, "%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_DOOR_UNLOCKED);
 
 	printf("SEND:%s\n", send);
 	
@@ -542,7 +546,7 @@ void sim7500e_do_door_opened_report(char* send)
 void sim7500e_do_invalid_moving_report(char* send)
 {
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_INVALID_MOVE);
+	sprintf(send, "%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_INVALID_MOVE);
 
 	printf("SEND:%s\n", send);
 	
@@ -555,9 +559,9 @@ void sim7500e_do_gps_location_report(char* send)
 	memset(send, 0, LEN_MAX_SEND);
 
 	if (strlen((const char*)g_longitude) > 5) {
-		sprintf(send, "%s,%s,%s,%s,%s,%s,0$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_REPORT_GPS, g_longitude, g_latitude);
+		sprintf(send, "%s,%s,%s,%s,%s,%s,0$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_REPORT_GPS, g_longitude, g_latitude);
 	} else {
-		sprintf(send, "%s,%s,%s,%s,F,F,0$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_REPORT_GPS);
+		sprintf(send, "%s,%s,%s,%s,F,F,0$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_REPORT_GPS);
 	}
 
 	printf("SEND:%s\n", send);
@@ -569,7 +573,7 @@ void sim7500e_do_gps_location_report(char* send)
 void sim7500e_do_iap_success_report(char* send)
 {
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_IAP_SUCCESS, g_sw_version);
+	sprintf(send, "%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_IAP_SUCCESS, g_sw_version);
 
 	printf("SEND:%s\n", send);
 	
@@ -580,7 +584,7 @@ void sim7500e_do_iap_success_report(char* send)
 void sim7500e_do_charge_start_report(char* send)
 {
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s,%s,%d$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_CHARGE_STARTED, (char*)g_bms_vol_percent, g_bms_charged_times);
+	sprintf(send, "%s,%s,%s,%s,%s,%d$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_CHARGE_STARTED, (char*)g_bms_vol_percent, g_bms_charged_times);
 
 	printf("SEND:%s\n", send);
 	
@@ -591,7 +595,7 @@ void sim7500e_do_charge_start_report(char* send)
 void sim7500e_do_charge_stop_report(char* send)
 {
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s,%s,%d$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_CHARGE_STOPED, (char*)g_bms_vol_percent, g_bms_charged_times);
+	sprintf(send, "%s,%s,%s,%s,%s,%d$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_CHARGE_STOPED, (char*)g_bms_vol_percent, g_bms_charged_times);
 
 	printf("SEND:%s\n", send);
 	
@@ -602,7 +606,7 @@ void sim7500e_do_charge_stop_report(char* send)
 void sim7500e_do_calypso_report(char* send)
 {
 	memset(send, 0, LEN_MAX_SEND);
-	sprintf(send, "%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, imei, CMD_CALYPSO_UPLOAD, calypso_card_id);
+	sprintf(send, "%s,%s,%s,%s,%s$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_CALYPSO_UPLOAD, calypso_card_id);
 
 	printf("SEND:%s\n", send);
 	
@@ -647,7 +651,7 @@ void sim7500e_parse_msg(char* msg, char* send)
 						sim7500e_do_engine_start_ack(send);
 					}
 				} else {
-					// TBD
+					// TBD: Exception Process
 				}
 			}
 		}
@@ -676,7 +680,7 @@ void sim7500e_parse_msg(char* msg, char* send)
 			} else if (QUERY_BMS == cmd_type) {
 				sim7500e_do_query_bms_ack(send);
 			} else if (MP3_PLAY == cmd_type) {
-				strcpy((char*)g_mp3_name_play, split_str);
+				strcpy((char*)g_mp3_play_name, split_str);
 				sim7500e_do_mp3_play_ack(send);
 			} else if (MP3_UPDATE == cmd_type) {
 				g_mp3_update = 1;
@@ -706,56 +710,56 @@ void sim7500e_parse_msg(char* msg, char* send)
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////// 
-const u8 *modetbl[2]={"TCP","UDP"};
 void sim7500e_tcp_connect(u8 mode,u8* ipaddr,u8* port)
 { 
 	u8 i = 0;
-	u8 *p,*p1,*p2;
-	u16 timex=0;
-	u8 count=0;
-	u16 gps_cnt=0;
-	u8 connectsta=0;			//0,正在连接;1,连接成功;2,连接关闭; 
-	u8 hbeaterrcnt=0;			//心跳错误计数器,连续5次心跳信号无应答,则重新连接
+	u8 count = 0;
+	u8 *p2 = NULL;
+	u8 oldsta = 0XFF;
+	u8 connectsta = 0;			//0,正在连接;1,连接成功;2,连接关闭; 
+	u8 hbeaterrcnt = 0;			//心跳错误计数器,连续5次心跳信号无应答,则重新连接
 	u8 iap_success = 0;
-	u8 oldsta=0XFF;
-	p=mymalloc(SRAMIN,100);		//申请100字节内存
-	p1=mymalloc(SRAMIN,100);	//申请100字节内存
+
+	u16 timex = 0;
+	u16 gps_cnt = 0;
 	
 	for (i=0; i<5; i++) {
 		if (0 == sim7500e_send_cmd("AT","OK",20))break;
-		if (4 == i) SoftReset();
+		if (4 == i) return;
 		delay_ms(50);
 	}
 	
 	if(sim7500e_send_cmd("ATE0","OK",40)) {
-		if(sim7500e_send_cmd("ATE0","OK",40))SoftReset();// 关闭回显
+		if(sim7500e_send_cmd("ATE0","OK",40)) return;// 关闭回显
 	}
 
 	// Get IMEI
 	if(sim7500e_send_cmd("AT+GSN","OK",40)) {
-		if(sim7500e_send_cmd("AT+GSN","OK",40))SoftReset();
+		if(sim7500e_send_cmd("AT+GSN","OK",40)) return;
 	}
 	sim7500e_imei_check();
+
+	// TBD: Get ICCID
 	
 	// Open GPS
 	if(sim7500e_send_cmd("AT+CGNSPWR=1","OK",40)) {
-		if(sim7500e_send_cmd("AT+CGNSPWR=1","OK",40))SoftReset();
+		if(sim7500e_send_cmd("AT+CGNSPWR=1","OK",40)) return;
 	}
 	
 	if(sim7500e_send_cmd("AT+CGATT?","+CGATT: 1",40)) {
-		if(sim7500e_send_cmd("AT+CGATT?","+CGATT: 1",40))SoftReset();
+		if(sim7500e_send_cmd("AT+CGATT?","+CGATT: 1",40)) return;
 	}
 
 	if(sim7500e_send_cmd("AT+CIPSHUT","SHUT OK",200)) {
-		if(sim7500e_send_cmd("AT+CIPSHUT","SHUT OK",200))SoftReset();
+		if(sim7500e_send_cmd("AT+CIPSHUT","SHUT OK",200)) return;
 	}
 	
 	if(sim7500e_send_cmd("AT+CSTT=\"CMNET\"","OK",40)) {
-		if(sim7500e_send_cmd("AT+CSTT=\"CMNET\"","OK",40))SoftReset();
+		if(sim7500e_send_cmd("AT+CSTT=\"CMNET\"","OK",40)) return;
 	}
 	
 	if(sim7500e_send_cmd("AT+CIICR","OK",200)) {
-		if(sim7500e_send_cmd("AT+CIICR","OK",200))SoftReset();
+		if(sim7500e_send_cmd("AT+CIICR","OK",200)) return;
 	}
 	
 	sim7500e_send_cmd("AT+CIFSR",0,40);
@@ -775,6 +779,7 @@ void sim7500e_tcp_connect(u8 mode,u8* ipaddr,u8* port)
 	while (1) {
 		if (sim7500e_send_cmd("AT+CIPSTART=\"TCP\",\"47.105.222.239\",88", "CONNECT",600)) {// Max 600*50ms = 30s		
 			if(sim7500e_send_cmd("AT+CIPSHUT","SHUT OK",200)) {
+				delay_ms(1000);
 				sim7500e_send_cmd("AT+CIPSHUT","SHUT OK",200);
 			}
 		}
@@ -782,29 +787,27 @@ void sim7500e_tcp_connect(u8 mode,u8* ipaddr,u8* port)
 		if (1 == sim7500dev.tcp_status) {// Connected OK
 			break;
 		} else {
-			//write_logs("SIM7000E", (char*)"Cannot Setup TCP Connect, just soft restart...\n", strlen((char*)"Cannot Setup TCP Connect, just soft restart...\n"), 3);
-			//printf("Cannot Setup TCP Connect, just soft restart...\n");
-			// SoftReset();
+			// write_logs("SIM7000E", (char*)"Cannot Setup TCP Connect, just soft restart...\n", strlen((char*)"Cannot Setup TCP Connect, just soft restart...\n"), 3);
+			// printf("Cannot Setup TCP Connect, just soft restart...\n");
 			// Re-Close->Open Try
 			delay_ms(100);
 		}
 	}
 				
 	delay_ms(100);
-	if(sim7500e_send_cmd("AT+CIPSEND=5",">",40))SoftReset();
+	if(sim7500e_send_cmd("AT+CIPSEND=5",">",40)) return;
 	delay_ms(100);
 	delay_ms(100);
 	
 	// 这里可能突然收到一个TCP意外CLOSED的消息
 	// 此时就无法收到SEND OK了
-	if(sim7500e_send_cmd("Hello","SEND OK",200))SoftReset();
+	if(sim7500e_send_cmd("Hello","SEND OK",200)) return;
 	delay_ms(100);
 	delay_ms(100);
-	if(sim7500e_do_dev_register_auto(send_buf))SoftReset();
+	if(sim7500e_do_dev_register_auto(send_buf)) return;
 	delay_ms(100);
 	delay_ms(100);
 
-	//	SoftReset();
 	if (iap_success) {
 		sim7500e_do_iap_success_report(send_buf);
 	}
@@ -828,9 +831,8 @@ void sim7500e_tcp_connect(u8 mode,u8* ipaddr,u8* port)
 					if (1 == sim7500dev.tcp_status) {// Connected OK
 						break;
 					} else {
-						//write_logs("SIM7000E", (char*)"Cannot Setup TCP Connect, just soft restart...\n", strlen((char*)"Cannot Setup TCP Connect, just soft restart...\n"), 3);
-						//printf("Cannot Setup TCP Connect, just soft restart...\n");
-						// SoftReset();
+						// write_logs("SIM7000E", (char*)"Cannot Setup TCP Connect, just soft restart...\n", strlen((char*)"Cannot Setup TCP Connect, just soft restart...\n"), 3);
+						// printf("Cannot Setup TCP Connect, just soft restart...\n");
 						// Re-Close->Open Try
 						delay_ms(100);
 					}
@@ -935,9 +937,9 @@ void sim7500e_tcp_connect(u8 mode,u8* ipaddr,u8* port)
 				USART3_RX_STA=0;
 			}
 		} else {
-			if (calypso_card_id[0] != 0) {
+			if (g_calypso_active) {
 				sim7500e_do_calypso_report(send_buf);
-				calypso_card_id[0] = 0;
+				g_calypso_active = 0;
 			}
 		}
 		if(oldsta!=connectsta)
@@ -946,7 +948,4 @@ void sim7500e_tcp_connect(u8 mode,u8* ipaddr,u8* port)
 		} 
 		timex++; 
 	}
-	
-	myfree(SRAMIN,p);
-	myfree(SRAMIN,p1);
 }
