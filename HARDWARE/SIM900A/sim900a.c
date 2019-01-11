@@ -10,6 +10,7 @@
 #include "can1.h"
 #include "rfid.h"
 #include "MP3PLAY.H"
+#include "rtc.h"
 
 // Door LOCK Sta:
 // BIT7: 0-idle, 1-changed
@@ -94,7 +95,7 @@ const char* cmd_list[] = {
 char send_buf[LEN_MAX_SEND] = "";
 char recv_buf[LEN_MAX_RECV] = "";
 
-char g_server_time[LEN_SYS_TIME+1] = "";
+u8 g_server_time[LEN_SYS_TIME+1] = "";
 
 static u8 g_ring_times = 0;
 static u8 g_lamp_times = 0;
@@ -106,7 +107,7 @@ u8 g_longitude[32] = "";
 u8 g_latitude[32] = "";
 u8 g_imei_str[32] = "";
 
-void sim7500e_mobit_process(u8 hbeaterrcnt);
+void sim7500e_mobit_process(u8* hbeaterrcnt);
 
 u8 sim7500e_get_cmd_count()
 {
@@ -203,9 +204,9 @@ u8 sim7500e_gps_check(void)
 	
 	memset(g_latitude, 0, 32);
 	memset(g_longitude, 0, 32);
-	if (strlen(gps_temp_dat4) > 5) {
-		strcpy(g_latitude, gps_temp_dat4);
-		strcpy(g_longitude, gps_temp_dat5);
+	if (strlen((const char*)gps_temp_dat4) > 5) {
+		strcpy((char*)g_latitude, (const char*)gps_temp_dat4);
+		strcpy((char*)g_longitude, (const char*)gps_temp_dat5);
 		printf("GPS Latitude(%s), Longitude(%s)\n", gps_temp_dat4, gps_temp_dat5);
 	} else {
 		printf("Get GPS Nothing...\n");
@@ -226,7 +227,8 @@ u8* sim7500e_check_cmd(u8 *str)
 	{ 
 		USART3_RX_BUF[USART3_RX_STA&0X7FFF]=0;//添加结束符
 
-		write_logs("SIM7000E", (char*)USART3_RX_BUF, USART3_RX_STA&0X7FFF, 0);
+		printf("SIM7000E-01 Recv Data %s\n", USART3_RX_BUF);
+		// write_logs("SIM7000E", (char*)USART3_RX_BUF, USART3_RX_STA&0X7FFF, 0);
 		
 		if (0 == strcmp((const char*)str, "CONNECT")) {
 			strx=sim7500e_connect_check();
@@ -255,7 +257,8 @@ u8 sim7500e_send_cmd(u8 *cmd,u8 *ack,u16 waittime)
 	
 	if(USART3_RX_STA&0X8000) {
 		USART3_RX_BUF[USART3_RX_STA&0X7FFF]=0;	//添加结束符 
-		write_logs("SIM7000E", (char*)USART3_RX_BUF, USART3_RX_STA&0X7FFF, 0);
+		printf("SIM7000E-02 Recv Data %s\n", USART3_RX_BUF);
+		// write_logs("SIM7000E", (char*)USART3_RX_BUF, USART3_RX_STA&0X7FFF, 0);
 	}
 	USART3_RX_STA=0;
 	
@@ -264,7 +267,7 @@ u8 sim7500e_send_cmd(u8 *cmd,u8 *ack,u16 waittime)
 	}
 	
 	printf("SIM7000E Send Data %s\n", cmd);
-	write_logs("SIM7000E", (char*)cmd, strlen((char*)cmd), 1);
+	// write_logs("SIM7000E", (char*)cmd, strlen((char*)cmd), 1);
 	
 	sim7500dev.cmdon=1;//进入指令等待状态
 	if((u32)cmd<=0XFF)
@@ -555,6 +558,9 @@ void sim7500e_do_gps_location_report(char* send)
 {
 	memset(send, 0, LEN_MAX_SEND);
 
+	sim7500e_send_cmd("AT+CGNSINF","OK",40);
+	sim7500e_gps_check();
+	
 	if (strlen((const char*)g_longitude) > 5) {
 		sprintf(send, "%s,%s,%s,%s,%s,%s,0$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_REPORT_GPS, g_longitude, g_latitude);
 	} else {
@@ -672,7 +678,7 @@ void sim7500e_parse_msg(char* msg, char* send)
 		if (index > data_pos) {
 			if (DEV_REGISTER == cmd_type) {
 				if (5 == index) {
-					strncpy(g_server_time, split_str, LEN_SYS_TIME);
+					strncpy((char*)g_server_time, split_str, LEN_SYS_TIME);
 					g_server_time[LEN_SYS_TIME] = '\0';
 					printf("g_server_time = %s\n", g_server_time);
 					// TBD: Need To Check
@@ -723,7 +729,7 @@ u8 sim7500e_setup_connect(void)
 	i = 0;
 	while (1) {
 		// sim7500e_send_cmd("AT+CIPSHUT","SHUT OK",200);
-		if (sim7500e_send_cmd("AT+CIPSTART=\"TCP\",\"47.105.222.239\",88", "CONNECT",600)) {// Max 600*50ms = 30s		
+		if (sim7500e_send_cmd("AT+CIPSTART=\"TCP\",\"47.105.245.93\",88", "CONNECT",600)) {// Max 600*50ms = 30s		
 			if(sim7500e_send_cmd("AT+CIPSHUT","SHUT OK",200)) {
 				delay_ms(1000);
 				sim7500e_send_cmd("AT+CIPSHUT","SHUT OK",200);
@@ -815,7 +821,7 @@ u8 sim7500e_setup_initial(void)
 	return sim7500e_setup_connect();
 }
 
-u8 sim7500e_idle_actions(u16 gps_cnt)
+void sim7500e_idle_actions(u16 gps_cnt)
 {
 	if (g_calypso_active) {
 		sim7500e_do_calypso_report(send_buf);
@@ -842,13 +848,9 @@ u8 sim7500e_idle_actions(u16 gps_cnt)
 	}
 	if (g_gps_trace_gap) {
 		// every loop delay 10ms
-		if(0 == gps_cnt%(g_gps_trace_gap*100)) {
-			gps_cnt = 0;
+		if (0 == gps_cnt) {
 			sim7500e_do_gps_location_report(send_buf);
 		}
-		gps_cnt++;
-	} else {
-		gps_cnt = 0;
 	}
 	if (g_mp3_update) {
 		// do http get
@@ -858,17 +860,18 @@ u8 sim7500e_idle_actions(u16 gps_cnt)
 	}
 }
 
-void sim7500e_mobit_process(u8 hbeaterrcnt)
+void sim7500e_mobit_process(u8* hbeaterrcnt)
 {
 	u8 *pTemp = NULL;
 	u8 data_lenth = 0;
 	USART3_RX_BUF[USART3_RX_STA&0X7FFF]=0;	//添加结束符 
-	write_logs("SIM7000E", (char*)USART3_RX_BUF, USART3_RX_STA&0X7FFF, 0);
+	printf("SIM7000E-03 Recv Data %s\n", USART3_RX_BUF);
+	// write_logs("SIM7000E", (char*)USART3_RX_BUF, USART3_RX_STA&0X7FFF, 0);
 			
 	//printf("RECVED %s",USART3_RX_BUF);				//发送到串口  
-	if(hbeaterrcnt)							//需要检测心跳应答
+	if(*hbeaterrcnt)							//需要检测心跳应答
 	{
-		if(strstr((const char*)USART3_RX_BUF,"SEND OK"))hbeaterrcnt=0;//心跳正常
+		if(strstr((const char*)USART3_RX_BUF,"SEND OK"))*hbeaterrcnt=0;//心跳正常
 	}
 			
 	// Received User Data
@@ -896,8 +899,7 @@ void sim7500e_mobit_process(u8 hbeaterrcnt)
 // TBD Add Watch dog in sim7000e loop
 /////////////////////////////////////////////////////////////////////////////////////////////////////////// 
 void sim7500e_communication_loop(u8 mode,u8* ipaddr,u8* port)
-{ 
-	u8 i = 0;
+{
 	u8 oldsta = 0XFF;
 	u8 connectsta = 0;			//0,正在连接;1,连接成功;2,连接关闭; 
 	u8 hbeaterrcnt = 0;			//心跳错误计数器,连续5次心跳信号无应答,则重新连接
@@ -943,6 +945,15 @@ void sim7500e_communication_loop(u8 mode,u8* ipaddr,u8* port)
 		// At most, lost one receive for AT-ACK
 		// But TCP package will not be skiped
 		if (connectsta == 1) {
+			if (g_gps_trace_gap) {
+				// every loop delay 10ms
+				if(0 == gps_cnt%(g_gps_trace_gap*100)) {
+					gps_cnt = 0;
+				}
+			} else {
+				gps_cnt = 0;
+			}
+			
 			sim7500e_idle_actions(gps_cnt);
 
 			// every loop delay 10ms
@@ -954,11 +965,13 @@ void sim7500e_communication_loop(u8 mode,u8* ipaddr,u8* port)
 				hbeaterrcnt++;
 				printf("hbeaterrcnt = %d\r\n",hbeaterrcnt);
 			}
+			
+			gps_cnt++;
 		}
 
 		delay_ms(10);
 		if (USART3_RX_STA&0X8000) {
-			sim7500e_mobit_process(hbeaterrcnt);
+			sim7500e_mobit_process(&hbeaterrcnt);
 		}
 
 		if (oldsta != connectsta) {

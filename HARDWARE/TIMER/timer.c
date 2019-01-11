@@ -53,7 +53,7 @@ void TIM2_IRQHandler(void)
 	if(TIM_GetITStatus(TIM3,TIM_IT_Update)==SET) //溢出中断
 	{
 
-		LED0=!LED0;//LED1翻转
+		//LED0=!LED0;//LED0翻转
   	
 	}
 	TIM_ClearITPendingBit(TIM3,TIM_IT_CC3|TIM_IT_Update);  //清除中断标志位
@@ -76,7 +76,7 @@ void TIM4_IRQHandler(void)
 	}
 	if(TIM_GetITStatus(TIM4, TIM_IT_CC3) != RESET)//捕获1发生捕获事件
 	{
-		LED1=!LED1;//LED1翻转
+		// LED1=!LED1;//LED1翻转
 		capture1= TIM_GetCapture3(TIM4)/10;
 		total_msTtemp+=capture1;
 		total_msTtemp-=capture2;

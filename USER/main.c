@@ -145,10 +145,10 @@ void system_init(void)
 	while(1)
 	{
 		delay_ms(1000);
- 		LED1=0; 	   
+ 		//LED1=0; 	   
  		VS_Sine_Test();	   	 
 		delay_ms(1000);
-		LED1=1;
+		//LED1=1;
 	}
 #endif
 #endif
@@ -166,7 +166,7 @@ void SoftReset(void)
 //main函数	  					
 int main(void)
 { 	
-	SCB->VTOR = *((u32 *)0x0800FFF8);
+//	SCB->VTOR = *((u32 *)0x0800FFF8);
 	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);//设置系统中断优先级分组2
   system_init();		//系统初始化 
  	OSInit();   
@@ -324,11 +324,11 @@ void HardFault_Handler(void)
  	printf("DFSR:%8X\r\n",temp);	//显示错误值
    	temp=SCB->AFSR;					//辅助fault状态寄存器
  	printf("AFSR:%8X\r\n",temp);	//显示错误值
- 	LED1=!LED1;
+ 	// LED1=!LED1;
  	while(t<5)
 	{
 		t++;
-		LED0=!LED0;
+		LED2=!LED2;
 		//BEEP=!BEEP;
 		for(i=0;i<0X1FFFFF;i++);
  	}
