@@ -763,6 +763,7 @@ u8 sim7500e_setup_connect(void)
 
 u8 sim7500e_setup_initial(void)
 {
+	u8 i = 0;
 	for (i=0; i<5; i++) {
 		if (0 == sim7500e_send_cmd("AT","OK",20))break;
 		if (4 == i) return 1;

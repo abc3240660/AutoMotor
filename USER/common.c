@@ -44,7 +44,7 @@ void sys_env_dump(void)
 
 	W25QXX_Read((u8*)&sys_env, ENV_SECTOR_INDEX*4096, sizeof(SYS_ENV));//读出整个扇区的内容
 	
-	if (0x6821== active_flag) {
+	if (0x6821 == sys_env.active_flag) {
 		g_bms_charged_times = sys_env.charge_times;
 		printf("charge_times = %d\n", sys_env.charge_times);
 	} else {

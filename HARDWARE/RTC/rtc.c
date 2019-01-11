@@ -125,7 +125,7 @@ void RTC_Sync_time(u8* sync_time)
 
 	for (i=0; i<14; i++) {
 		if ((sync_time[i]<'0') || (sync_time[i]>'9')) {
-			printf("Time Format Invalid!!!\n")
+			printf("Time Format Invalid!!!\n");
 			return;
 		}
 	}

@@ -122,42 +122,42 @@ void uart_init(u32 bound){
 #define TRIG_DOOR_OPENED "TRIG-DOOR-OPENED"
 #define TRIG_DOOR_CLOSED "TRIG-DOOR-CLOSED"
 #define TRIG_INVALID_MOVE "TRIG-INVALID-MOVE"
-#define TRIg_bms_charge_staRTED "TRIG-CHARGE-STARTED"
+#define TRIg_bms_charged_timesRTED "TRIG-CHARGE-STARTED"
 #define TRIG_CHARGE_STOPED "TRIG-CHARGE-STOPED"
 #define PLAY_MP3_MUSIC "PLAY-MP3="
 
-extern int hbeat_time;
-extern u8 g_door_lock_sta;
+extern int g_hbeat_gap;
+extern u8 g_drlock_sta_chged;
 extern u8 g_invaid_move;
-extern u8 g_bms_charge_sta;
+extern u8 g_bms_charged_times;
 extern u8 g_mp3_play;
-extern u8 g_mp3_name_play[32];
-extern int gps_report_gap;
+extern u8 g_mp3_play_name[32];
+extern int g_gps_trace_gap;
 
 void debug_process(void)
 {
 	if (0 == strncmp((const char*)USART_RX_BUF, SET_GPS_GAP, strlen(SET_GPS_GAP))) {
-		hbeat_time = atoi((const char*)(USART_RX_BUF+strlen(SET_GPS_GAP)));
+		g_hbeat_gap = atoi((const char*)(USART_RX_BUF+strlen(SET_GPS_GAP)));
 	} else if (0 == strncmp((const char*)USART_RX_BUF, SET_HBEAT_GAP, strlen(SET_HBEAT_GAP))) {
-		gps_report_gap = atoi((const char*)(USART_RX_BUF+strlen(SET_HBEAT_GAP)));
+		g_gps_trace_gap = atoi((const char*)(USART_RX_BUF+strlen(SET_HBEAT_GAP)));
 	} else if (0 == strncmp((const char*)USART_RX_BUF, TRIG_DOOR_OPENED, strlen(TRIG_DOOR_OPENED))) {
-		g_door_lock_sta = 1;
-		g_door_lock_sta |= 0x80; 
+		g_drlock_sta_chged = 1;
+		g_drlock_sta_chged |= 0x80; 
 	} else if (0 == strncmp((const char*)USART_RX_BUF, TRIG_DOOR_CLOSED, strlen(TRIG_DOOR_CLOSED))) {
-		g_door_lock_sta = 0;
-		g_door_lock_sta |= 0x80; 
+		g_drlock_sta_chged = 0;
+		g_drlock_sta_chged |= 0x80; 
 	} else if (0 == strncmp((const char*)USART_RX_BUF, TRIG_INVALID_MOVE, strlen(TRIG_INVALID_MOVE))) {
 		g_invaid_move = 1;
-	} else if (0 == strncmp((const char*)USART_RX_BUF, TRIg_bms_charge_staRTED, strlen(TRIg_bms_charge_staRTED))) {
-		g_bms_charge_sta = 1;
-		g_bms_charge_sta |= 0x80; 
+	} else if (0 == strncmp((const char*)USART_RX_BUF, TRIg_bms_charged_timesRTED, strlen(TRIg_bms_charged_timesRTED))) {
+		g_bms_charged_times = 1;
+		g_bms_charged_times |= 0x80; 
 	} else if (0 == strncmp((const char*)USART_RX_BUF, TRIG_CHARGE_STOPED, strlen(TRIG_CHARGE_STOPED))) {
-		g_bms_charge_sta = 0;
-		g_bms_charge_sta |= 0x80; 
+		g_bms_charged_times = 0;
+		g_bms_charged_times |= 0x80; 
 	} else if (0 == strncmp((const char*)USART_RX_BUF, PLAY_MP3_MUSIC, strlen(PLAY_MP3_MUSIC))) {
-		memset(g_mp3_name_play, 0, 32);
-		strcpy((char*)g_mp3_name_play, (const char*)(USART_RX_BUF+strlen(PLAY_MP3_MUSIC)));
-		// printf("g_mp3_name_play = %s\n", g_mp3_name_play);
+		memset(g_mp3_play_name, 0, 32);
+		strcpy((char*)g_mp3_play_name, (const char*)(USART_RX_BUF+strlen(PLAY_MP3_MUSIC)));
+		// printf("g_mp3_play_name = %s\n", g_mp3_play_name);
 
 		g_mp3_play = 1;
 	}

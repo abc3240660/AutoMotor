@@ -200,7 +200,7 @@ void lower_task(void *pdata)
 			music_play((const char*)g_mp3_play_name);
 
 			g_mp3_play = 0;
-			memset(g_mp3_play, 0, 32);
+			memset(g_mp3_play_name, 0, 32);
 		}
 
     	OSTimeDlyHMSM(0,0,0,500);// 500ms
