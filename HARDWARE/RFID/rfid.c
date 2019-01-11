@@ -85,10 +85,10 @@ static RET_RFID cpr74_check_ack(void)
 		} else {
 			// TBD: HEX or CHR Check
 			// data_len = (UART5_RX_BUF[1] << 8) + UART5_RX_BUF[2];
-			data_len = (cpr74_chr2hex(UART5_RX_BUF[1]) << 8) + cpr74_chr2hex(UART5_RX_BUF[2]);
+			data_len = (UART5_RX_BUF[1] << 8) + UART5_RX_BUF[2];
 
 			// TBD: HEX or CHR Check
-			if (data_len != (UART5_RX_STA&0X7FFF)) {// Length Check
+			if ((data_len+1) != (UART5_RX_STA&0X7FFF)) {// Length Check
 				ret = RET_RFID_RECV_LEN_VALID;
 			}
 			if (data_len < 37) {// Length Check
