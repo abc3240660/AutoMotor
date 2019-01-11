@@ -25,11 +25,9 @@
 /////////////////////////////////////////////////////////////////////////
 
 typedef struct {
+	u16 active_flag;
 	u16 charge_times;
 } SYS_ENV;
-
-extern SYS_ENV g_sys_env;
-
 
 void sys_env_init(void);
 void sys_env_save(void);

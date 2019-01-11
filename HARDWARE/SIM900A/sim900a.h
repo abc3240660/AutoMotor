@@ -116,7 +116,7 @@ u8 sim7500e_hex2chr(u8 hex);
 void sim7500e_unigbk_exchange(u8 *src,u8 *dst,u8 mode);
 void sim7500e_cmsgin_check(void);
 void sim7500e_status_check(void);
-void sim7500e_tcp_connect(u8 mode,u8* ipaddr,u8* port);
+void sim7500e_communication_loop(u8 mode,u8* ipaddr,u8* port);
 
 #endif/* __SIM7500E_H__ */
 

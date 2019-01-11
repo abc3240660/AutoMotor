@@ -93,7 +93,8 @@ void system_init(void)
 	g_sys_env.charge_times = 123;
 	
 	sys_env_init();
-	sys_env_save();
+
+	// Get g_bms_charged_times
 	sys_env_dump();
 #endif
 
@@ -304,7 +305,7 @@ void usart_task(void *pdata)
 void higher_task(void *pdata)
 {
 	while (1) {
-		sim7500e_tcp_connect(0,NULL,NULL);
+		sim7500e_communication_loop(0,NULL,NULL);
     	OSTimeDlyHMSM(0,0,0,500);// 500ms
 	}
 }

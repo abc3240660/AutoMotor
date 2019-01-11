@@ -119,6 +119,31 @@ u8 My_RTC_Init(void)
 	return 0;
 }
 
+void RTC_Sync_time(u8* sync_time)
+{
+	u8 i = 0;
+
+	for (i=0; i<14; i++) {
+		if ((sync_time[i]<'0') || (sync_time[i]>'9')) {
+			printf("Time Format Invalid!!!\n")
+			return;
+		}
+	}
+
+	// 20190111141156
+	if (14 == strlen(sync_time)) {
+		u8 year  = sync_time[2]  * 10 + sync_time[3];
+		u8 month = sync_time[4]  * 10 + sync_time[5];
+		u8 day   = sync_time[6]  * 10 + sync_time[7];
+		u8 hour  = sync_time[8]  * 10 + sync_time[9];
+		u8 min   = sync_time[10] * 10 + sync_time[11];
+		u8 sec   = sync_time[12] * 10 + sync_time[13];
+
+		RTC_Set_Time(year,month,day,RTC_H12_AM);
+		RTC_Set_Date(hour,min,sec,1);
+	}
+}
+
 //设置闹钟时间(按星期闹铃,24小时制)
 //week:星期几(1~7)
 //hour,min,sec:小时,分钟,秒钟

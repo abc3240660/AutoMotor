@@ -1,9 +1,9 @@
 #include "can1.h"
 #include "led.h"
 
-extern u8 g_door_lock_sta;
 extern u8 g_door_state;
 extern u8 g_power_state;
+extern u8 g_drlock_sta_chged;
 /****************************************************************************
 * 名    称: u8 CAN1_Mode_Init(u8 mode)
 * 功    能：CAN初始化
@@ -147,13 +147,13 @@ u8 CAN1_Receive_Msg(u8 *buf)
 	// BIT0-lamp: 0-OFF / 1-ON
 	// BIT1-ring: 0-OFF / 1-ON
 	if (0x100850C8 == RxMessage.ExtId) {
-		if (0x02 == (RxMessage.Data[0]&0x2)) {// locked / close
-			if (1 == g_door_lock_sta) {
-				g_door_lock_sta = 0;
+		if (0x02 == (RxMessage.Data[0]&0x2)) {// locked
+			if (1 == g_drlock_sta_chged) {
+				g_drlock_sta_chged = 0;
 			}
-		} else {// unlocked / open
-			if (0 == g_door_lock_sta) {
-				g_door_lock_sta = 1;
+		} else {// unlocked
+			if (0 == g_drlock_sta_chged) {
+				g_drlock_sta_chged = 1;
 			}
 		}
 
@@ -169,7 +169,7 @@ u8 CAN1_Receive_Msg(u8 *buf)
 			g_power_state = 0;
 		}
 
-		g_door_lock_sta |= 0x80;
+		g_drlock_sta_chged |= 0x80;
 	}
 
 	return RxMessage.DLC;	
