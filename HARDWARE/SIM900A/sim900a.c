@@ -106,6 +106,8 @@ u8 g_longitude[32] = "";
 u8 g_latitude[32] = "";
 u8 g_imei_str[32] = "";
 
+void sim7500e_mobit_process(u8 hbeaterrcnt);
+
 u8 sim7500e_get_cmd_count()
 {
 	u8 cnt = 0;
@@ -228,6 +230,8 @@ u8* sim7500e_check_cmd(u8 *str)
 		
 		if (0 == strcmp((const char*)str, "CONNECT")) {
 			strx=sim7500e_connect_check();
+		} else if (0 == strcmp((const char*)str, PROTOCOL_HEAD)) {// Unexcept Recved
+			sim7500e_mobit_process(0);
 		} else {
 			strx=strstr((const char*)USART3_RX_BUF,(const char*)str);
 		}
@@ -741,12 +745,15 @@ u8 sim7500e_setup_connect(void)
 	}
 
 	if (1 == sim7500dev.tcp_status) {// Connected OK
-		delay_ms(100);
+		delay_ms(10);
 		if(sim7500e_send_cmd("AT+CIPSEND=5",">",40)) return 1;
-		delay_ms(200);
+		delay_ms(10);
 	
 		if(sim7500e_send_cmd("Hello","SEND OK",200)) return 1;
-		delay_ms(200);
+		delay_ms(10);
+
+		if(sim7500e_do_dev_register_auto(send_buf)) return 1;
+		delay_ms(10);
 
 		return 0;
 	} else {
@@ -850,12 +857,46 @@ u8 sim7500e_idle_actions(u16 gps_cnt)
 	}
 }
 
+void sim7500e_mobit_process(u8 hbeaterrcnt)
+{
+	u8 *pTemp = NULL;
+	u8 data_lenth = 0;
+	USART3_RX_BUF[USART3_RX_STA&0X7FFF]=0;	//添加结束符 
+	write_logs("SIM7000E", (char*)USART3_RX_BUF, USART3_RX_STA&0X7FFF, 0);
+			
+	//printf("RECVED %s",USART3_RX_BUF);				//发送到串口  
+	if(hbeaterrcnt)							//需要检测心跳应答
+	{
+		if(strstr((const char*)USART3_RX_BUF,"SEND OK"))hbeaterrcnt=0;//心跳正常
+	}
+			
+	// Received User Data
+	pTemp = (u8*)strstr((const char*)USART3_RX_BUF, PROTOCOL_HEAD);
+	if (pTemp) {
+		data_lenth = strlen((const char*)pTemp);
+				
+		memset(recv_buf, 0, LEN_MAX_RECV);
+		memcpy(recv_buf, pTemp, LEN_MAX_RECV);
+				
+		if (data_lenth < LEN_MAX_RECV) {
+			recv_buf[data_lenth] = '\0';// $ -> 0
+		}
+				
+		USART3_RX_STA=0;// Let Interrupt Go On Saving DATA
+				
+		printf("RECVED MSG(%dB): %s\n", data_lenth, recv_buf);
+				
+		sim7500e_parse_msg(recv_buf, send_buf);
+	} else {
+		USART3_RX_STA=0;
+	}
+}
+
+// TBD Add Watch dog in sim7000e loop
 /////////////////////////////////////////////////////////////////////////////////////////////////////////// 
 void sim7500e_communication_loop(u8 mode,u8* ipaddr,u8* port)
 { 
 	u8 i = 0;
-	u8 count = 0;
-	u8 *pTemp = NULL;
 	u8 oldsta = 0XFF;
 	u8 connectsta = 0;			//0,正在连接;1,连接成功;2,连接关闭; 
 	u8 hbeaterrcnt = 0;			//心跳错误计数器,连续5次心跳信号无应答,则重新连接
@@ -868,93 +909,61 @@ void sim7500e_communication_loop(u8 mode,u8* ipaddr,u8* port)
 		return;
 	}
 
-	// if tcp closed, need to resend this
-	if(sim7500e_do_dev_register_auto(send_buf)) return 1;
-	delay_ms(200);
-
 	if (iap_success) {
 		sim7500e_do_iap_success_report(send_buf);
 	}
 
 	// Connected OK
-	while(1)
-	{ 
-		if((timex%20)==0)
-		{
-			LED0=!LED0;
-			count++;	
-			if(connectsta==2||hbeaterrcnt>8)//连接中断了,或者连续8次心跳没有正确发送成功,则重新连接
-			{
+	while(1) {
+		if ((timex%20) == 0) {
+			LED0 = !LED0;
+
+			// TCP connect failed, just re-connect
+			if (connectsta==2 || hbeaterrcnt>8) {
 				if (sim7500e_setup_connect()) {
-					return;
+					break;
 				}
 
-				connectsta=0;	
- 				hbeaterrcnt=0;
+				connectsta = 0;
+ 				hbeaterrcnt = 0;
 			}
 		}
-		if(connectsta==0&&(timex%200)==0)//连接还没建立的时候,每2秒查询一次CIPSTATUS.
-		{
-			sim7500e_send_cmd("AT+CIPSTATUS","OK",500);	//查询连接状态
+
+		// will not be run, because, if connectsta=0, will do re-connect
+		if ((connectsta==0) && (timex%200)==0) {
+			sim7500e_send_cmd("AT+CIPSTATUS","OK",500);
 			if(strstr((const char*)USART3_RX_BUF_BAK,"CLOSED"))connectsta=2;
 			if(strstr((const char*)USART3_RX_BUF_BAK,"CONNECT OK"))connectsta=1;
 			connectsta=1;
 		}
 
-		// Only When SIM7000E is idle, can do these actions
-		// hbeaterrcnt==0 -> last ack have received
-		if(connectsta==1&&hbeaterrcnt==0) {
+		// If TCP package arrive here, then it will be 
+		// parsed in sim7500e_send_cmd -> sim7500e_check_cmd
+		// At most, lost one receive for AT-ACK
+		// But TCP package will not be skiped
+		if (connectsta == 1) {
 			sim7500e_idle_actions(gps_cnt);
+
+			// every loop delay 10ms
+			if (timex >= (g_hbeat_gap*100)) {
+				timex = 0;
+			
+				sim7500e_do_heart_beat_auto(send_buf);
+				
+				hbeaterrcnt++;
+				printf("hbeaterrcnt = %d\r\n",hbeaterrcnt);
+			}
 		}
 
-		// every loop delay 10ms
-		if(connectsta==1&&timex>=(g_hbeat_gap*100))//连接正常的时候,每6秒发送一次心跳
-		{
-			timex=0;
-			
-			sim7500e_do_heart_beat_auto(send_buf);
-				
-			hbeaterrcnt++; 
-			printf("hbeaterrcnt:%d\r\n",hbeaterrcnt);//方便调试代码
-		} 
 		delay_ms(10);
-		if(USART3_RX_STA&0X8000)		//接收到一次数据了
-		{
-			u8 data_lenth = 0;
-			USART3_RX_BUF[USART3_RX_STA&0X7FFF]=0;	//添加结束符 
-			write_logs("SIM7000E", (char*)USART3_RX_BUF, USART3_RX_STA&0X7FFF, 0);
-			
-			//printf("RECVED %s",USART3_RX_BUF);				//发送到串口  
-			if(hbeaterrcnt)							//需要检测心跳应答
-			{
-				if(strstr((const char*)USART3_RX_BUF,"SEND OK"))hbeaterrcnt=0;//心跳正常
-			}
-			
-			// Received User Data
-			pTemp = (u8*)strstr((const char*)USART3_RX_BUF, PROTOCOL_HEAD);
-			if (pTemp) {
-				data_lenth = strlen((const char*)pTemp);
-				
-				memset(recv_buf, 0, LEN_MAX_RECV);
-				memcpy(recv_buf, pTemp, LEN_MAX_RECV);
-				
-				if (data_lenth < LEN_MAX_RECV) {
-					recv_buf[data_lenth] = '\0';// $ -> 0
-				}
-				
-				USART3_RX_STA=0;// Let Interrupt Go On Saving DATA
-				
-				printf("RECVED MSG(%dB): %s\n", data_lenth, recv_buf);
-				
-				sim7500e_parse_msg(recv_buf, send_buf);
-			} else {
-				USART3_RX_STA=0;
-			}
+		if (USART3_RX_STA&0X8000) {
+			sim7500e_mobit_process(hbeaterrcnt);
 		}
-		if(oldsta!=connectsta)
-		{
-			oldsta=connectsta;
-		} 
-		timex++; 
+
+		if (oldsta != connectsta) {
+			oldsta = connectsta;
+		}
+
+		timex++;
 	}
 }
