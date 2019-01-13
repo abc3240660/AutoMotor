@@ -56,7 +56,13 @@ int fputc(int ch, FILE *f)
 	return ch;
 }
 #endif
- 
+void usart1_send_char(u8 c)
+{
+
+	while(USART_GetFlagStatus(USART1,USART_FLAG_TC)==RESET);
+    USART_SendData(USART1,c);   
+
+}
 #if EN_USART1_RX   //如果使能了接收
 //串口1中断服务程序
 //注意,读取USARTx->SR能避免莫名其妙的错误   	

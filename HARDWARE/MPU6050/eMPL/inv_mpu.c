@@ -534,7 +534,7 @@ const struct gyro_reg_s reg = {
 //};
 const struct hw_s hw={
   0x68,	 //addr
-  1024,	 //max_fifo
+  1024*2,	 //max_fifo
   118,	 //num_reg
   340,	 //temp_sens
   -521,	 //temp_offset
@@ -2953,7 +2953,7 @@ void mget_ms(unsigned long *time)
 u8 mpu_dmp_init(void)
 {
 	u8 res=0;
-//	IIC_Init(); 		//初始化IIC总线
+	//IIC_Init(); 		//初始化IIC总线
 	if(mpu_init()==0)	//初始化MPU6050
 	{	 
 		res=mpu_set_sensors(INV_XYZ_GYRO|INV_XYZ_ACCEL);//设置所需要的传感器
@@ -2973,7 +2973,7 @@ u8 mpu_dmp_init(void)
 		res=dmp_set_fifo_rate(DEFAULT_MPU_HZ);	//设置DMP输出速率(最大不超过200Hz)
 		if(res)return 7;   
 		res=run_self_test();		//自检
-		if(res)return 8;    
+		//if(res)return 8;    
 		res=mpu_set_dmp_state(1);	//使能DMP
 		if(res)return 9;     
 	}
