@@ -344,15 +344,17 @@ void TIM6_DAC_IRQHandler(void)
 	OSIntEnter();    		    
 	if(TIM_GetITStatus(TIM6,TIM_IT_Update)==SET)
 	{ 
-		UART5_RX_STA|=1<<15;
-		UART5_RX_BUF[UART5_RX_STA&0X7FFF]=0;
-		//printf("RFID RECVED:");
-		//for (i=0; i<(UART5_RX_STA&0X7FFF); i++) {
-		//	printf("%.2X ", UART5_RX_BUF[i]);
-		//}
-		//printf("\n");
+		if (UART5_RX_STA != 0) {
+			UART5_RX_STA|=1<<15;
+			UART5_RX_BUF[UART5_RX_STA&0X7FFF]=0;
+			//printf("RFID RECVED:");
+			//for (i=0; i<(UART5_RX_STA&0X7FFF); i++) {
+			//	printf("%.2X ", UART5_RX_BUF[i]);
+			//}
+			//printf("\n");
+		}
+
 		TIM_ClearITPendingBit(TIM6,TIM_IT_Update);
-   
 		TIM_Cmd(TIM6,DISABLE);
 	}				   
 	OSIntExit();  											 
@@ -380,19 +382,28 @@ void TIM6_Int_Init(u16 arr,u16 psc)
 	NVIC_InitStructure.NVIC_IRQChannelCmd=ENABLE;
 	NVIC_Init(&NVIC_InitStructure); 									 
 }
-extern vu16 USART3_RX_STA;
+extern u8 U3_RX_ID;// 0~3
+extern vu16 USART3_RX_STA[4];
+extern void USART3_Get_Free_Buf(void);
 void TIM7_IRQHandler(void)
 { 	
 	OSIntEnter();    		    
 	if(TIM_GetITStatus(TIM7,TIM_IT_Update)==SET)
 	{	 			   
-		USART3_RX_STA|=1<<15;
-		USART3_RX_BUF[USART3_RX_STA&0X7FFF]=0;
-		//printf("SIM7K RECVED: %s\n", USART3_RX_BUF);
-		//printf("SIM7000E Recv Data %s\n", USART3_RX_BUF);
-		//write_logs("SIM7000E", (char*)USART3_RX_BUF, USART3_RX_STA&0X7FFF, 0);
+		if (USART3_RX_STA[U3_RX_ID] != 0) {
+			USART3_RX_STA[U3_RX_ID] |= 1<<15;
+			USART3_RX_BUF[U3_RECV_LEN_ONE*U3_RX_ID + USART3_RX_STA[U3_RX_ID]&0X7FFF] = 0;
+			//printf("SIM7K RECVED: %s\n", USART3_RX_BUF+U3_RECV_LEN_ONE*U3_RX_ID);
+			//printf("SIM7000E Recv Data %s\n", USART3_RX_BUF+U3_RECV_LEN_ONE*U3_RX_ID);
+			//write_logs("SIM7000E", (char*)USART3_RX_BUF+U3_RECV_LEN_ONE*U3_RX_ID, USART3_RX_STA[U3_RX_ID]&0X7FFF, 0);
+
+			// Not Busy:    0->1->0->1->0->1->... (always switch between 0 and 1)
+			// little Busy: 0->1->2->0->1->0->1->... (may use till 2)
+			// very Busy:   0->1->2->3->0->1->0->1->... (may use till 3)
+			USART3_Get_Free_Buf();// Get first free buf id for next use
+		}
+
 		TIM_ClearITPendingBit(TIM7,TIM_IT_Update);
-   
 		TIM_Cmd(TIM7,DISABLE);
 	}	    
 	OSIntExit();  											 
