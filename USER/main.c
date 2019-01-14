@@ -254,7 +254,7 @@ void write_logs(char *module, char *log, u16 size, u8 mode)
 		printf("%s", g_logmsg);
 		
 		OSSemPend(sem_beep,0,&err);
-		res= f_open(&f_txt,(const TCHAR*)g_logname,FA_READ|FA_WRITE);
+		res = f_open(&f_txt,(const TCHAR*)g_logname,FA_READ|FA_WRITE);
 		if(res==0)
 		{			
 			f_lseek(&f_txt, f_txt.fsize);

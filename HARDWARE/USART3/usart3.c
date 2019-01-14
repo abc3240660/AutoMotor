@@ -6,45 +6,54 @@
 #include "timer.h"
 #include "ucos_ii.h"
 
-__align(8) u8 USART3_TX_BUF[USART3_MAX_SEND_LEN]; 	//发送缓冲,最大USART3_MAX_SEND_LEN字节
-//串口接收缓存区 	
-u8 USART3_RX_BUF[USART3_MAX_RECV_LEN]; 				//接收缓冲,最大USART3_MAX_RECV_LEN个字节.
+__align(8) u8 USART3_TX_BUF[USART3_MAX_SEND_LEN];
 
-//通过判断接收连续2个字符之间的时间差不大于10ms来决定是不是一次连续的数据.
-//如果2个字符接收间隔超过10ms,则认为不是1次连续数据.也就是超过10ms没有接收到
-//任何数据,则表示此次接收完毕.
-//接收到的数据状态
-//[15]:0,没有接收到数据;1,接收到了一批数据.
-//[14:0]:接收到的数据长度
-vu16 USART3_RX_STA=0;   	 
+// TBD: 2048B is too large for static array
+u8 USART3_RX_BUF[USART3_MAX_RECV_LEN];
+
+u8 U3_RX_ID = 0;// 0~3
+vu16 USART3_RX_STA[4] = {0};
+
+// Get free buf id for next use
+// >>> U3_RX_ID <<<
+// Not Busy:    0->1->0->1->0->1->... (always switch between 0 and 1)
+// little Busy: 0->1->2->0->1->0->1->... (may use till 2)
+// very Busy:   0->1->2->3->0->1->0->1->... (may use till 3)
+void USART3_Get_Free_Buf(void)
+{
+	u8 i = 0;
+
+	for (i=0; i<U3_RECV_BUF_CNT; i++) {
+		if ((USART3_RX_STA[i]&(1<<15)) == 0) {// first free Buf
+			U3_RX_ID = i;
+		}
+	}
+}
+
 void USART3_IRQHandler(void)
 {
-	u8 res;	    
-	OSIntEnter();    
-	if(USART_GetFlagStatus(USART3, USART_FLAG_RXNE) != RESET)//接收到数据
-	{	 
-		res=USART_ReceiveData(USART3); 			 
-		if((USART3_RX_STA&(1<<15))==0)//接收完的一批数据,还没有被处理,则不再接收其他数据
-		{ 
-			if(USART3_RX_STA<USART3_MAX_RECV_LEN)	//还可以接收数据
-			{
-				TIM_SetCounter(TIM7,0);       				//计数器清空
-				if(USART3_RX_STA==0) 				//使能定时器7的中断 
-				{
-					TIM_Cmd(TIM7, ENABLE); 	    			//使能定时器7
+	u8 res = 0;
+
+	OSIntEnter();
+
+	if (USART_GetFlagStatus(USART3, USART_FLAG_RXNE) != RESET) {
+		res = USART_ReceiveData(USART3);
+		if ((USART3_RX_STA[U3_RX_ID]&(1<<15)) == 0) {// frame not complete
+			if (USART3_RX_STA[U3_RX_ID] < USART3_MAX_RECV_LEN) {
+				TIM_SetCounter(TIM7, 0);
+				if (USART3_RX_STA[U3_RX_ID] == 0) {
+					TIM_Cmd(TIM7, ENABLE);
 				}
-				USART3_RX_BUF[USART3_RX_STA++]=res;	//记录接收到的值	 
-			}else 
-			{
-				USART3_RX_STA|=1<<15;				//强制标记接收完成
+				USART3_RX_BUF[U3_RECV_LEN_ONE*U3_RX_ID + USART3_RX_STA[U3_RX_ID]++] = res;
+			} else {
+				USART3_RX_STA[U3_RX_ID] |= 1<<15;
 			}
 		}
-	}  											 
-	OSIntExit();  											 
+	}
+
+	OSIntExit();
 }   
-//初始化IO 串口3
-//pclk1:PCLK1时钟频率(Mhz)
-//bound:波特率 
+
 void usart3_init(u32 bound)
 {  	
 	NVIC_InitTypeDef NVIC_InitStructure;
@@ -91,7 +100,10 @@ void usart3_init(u32 bound)
 	
   TIM_Cmd(TIM7, DISABLE); //关闭定时器7
 	
-	USART3_RX_STA=0;				//清零 
+	USART3_RX_STA[0] = 0;
+	USART3_RX_STA[1] = 0;
+	USART3_RX_STA[2] = 0;
+	USART3_RX_STA[3] = 0;
 }
 
 //串口3,printf 函数
