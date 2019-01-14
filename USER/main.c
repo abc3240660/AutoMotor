@@ -203,32 +203,6 @@ void start_task(void *pdata)
 	OS_EXIT_CRITICAL();	//退出临界区(可以被中断打断)
 } 
 
-// Play MP3 task
-void lower_task(void *pdata)
-{
-	while(1) {
-		if (g_mp3_play) {
-			music_play((const char*)g_mp3_play_name);
-
-			g_mp3_play = 0;
-			memset(g_mp3_play_name, 0, 32);
-		}
-
-    	OSTimeDlyHMSM(0,0,0,500);// 500ms
-	}
-}
-
-// MPU6050 Check and BT Data Parse
-void main_task(void *pdata)
-{
-	while(1) {
-		// TBD: Add MPU6050 Check
-		// TBD: Add Invalid Moving Check
-		// TBD: Add BT Data Parse
-    	OSTimeDlyHMSM(0,0,0,500);// 500ms
-	}
-}
-
 void create_logfile(void)
 {
 	if (0 == g_sd_existing) {
@@ -338,40 +312,81 @@ void usart1_report_imu(short aacx,short aacy,short aacz,short gyrox,short gyroy,
 	tbuf[23]=yaw&0XFF;
 	usart1_niming_report(0XAF,tbuf,28);//飞控显示帧,0XAF
 } 
-//执行最不需要时效性的代码
-void usart_task(void *pdata)
+
+void MPU6050_Risk_Check()
 {
+	u8 ret = 0;
 	float pitch,roll,yaw; 		//欧拉角
 	short aacx,aacy,aacz;		//加速度传感器原始数据
 	short gyrox,gyroy,gyroz;	//陀螺仪原始数据
 	short temp;					//温度
-	u8 ret=0;
+
+	ret = mpu_dmp_get_data(&pitch,&roll,&yaw);
+	usart1_send_char(ret);
+
+	if (ret == 0) {
+		temp=MPU_Get_Temperature();	//得到温度值
+		MPU_Get_Accelerometer(&aacx,&aacy,&aacz);	//得到加速度传感器数据
+		MPU_Get_Gyroscope(&gyrox,&gyroy,&gyroz);	//得到陀螺仪数据
+		//mpu6050_send_data(aacx,aacy,aacz,gyrox,gyroy,gyroz);//用自定义帧发送加速度和陀螺仪原始数据
+#if 0
+		usart1_report_imu(aacx,aacy,aacz,gyrox,gyroy,gyroz,(int)(roll*100),(int)(pitch*100),(int)(yaw*10));
+#else
+		//printf(" (int)(roll*100)=%d ,(int)(pitch*100)=%d ,(int)(yaw*10)=%d \r\n",(int)(roll*100),(int)(pitch*100),(int)(yaw*10));
+		if((pitch*100>4500)||(pitch*100<-4500)||(yaw*10>450)||(yaw*10<-450))
+			printf("FCL \r\n");
+		else
+			printf("MFC \r\n");
+#endif
+	}
+}
+
+// Play MP3 task
+void lower_task(void *pdata)
+{
 	while(1) {
-		delay_ms(3000);
-		//if((UART5_RX_STA&(1<<15)) != 0) {
-		//	cpr74_read_calypso();
-		//	UART5_RX_STA = 0;
-		//}
-		ret = mpu_dmp_get_data(&pitch,&roll,&yaw);
-		usart1_send_char(ret);
-		if(ret==0)
-		{ 
-			//printf(" OK \r\n");
-			temp=MPU_Get_Temperature();	//得到温度值
-			MPU_Get_Accelerometer(&aacx,&aacy,&aacz);	//得到加速度传感器数据
-			MPU_Get_Gyroscope(&gyrox,&gyroy,&gyroz);	//得到陀螺仪数据
-			//mpu6050_send_data(aacx,aacy,aacz,gyrox,gyroy,gyroz);//用自定义帧发送加速度和陀螺仪原始数据
-			#if 0
-				usart1_report_imu(aacx,aacy,aacz,gyrox,gyroy,gyroz,(int)(roll*100),(int)(pitch*100),(int)(yaw*10));
-			#else
-				//printf(" (int)(roll*100)=%d ,(int)(pitch*100)=%d ,(int)(yaw*10)=%d \r\n",(int)(roll*100),(int)(pitch*100),(int)(yaw*10));
-				if((pitch*100>4500)||(pitch*100<-4500)||(yaw*10>450)||(yaw*10<-450))
-					printf("FCL \r\n");
-				else
-					printf("MFC \r\n");
-			#endif
+		if (g_mp3_play) {
+			music_play((const char*)g_mp3_play_name);
+
+			g_mp3_play = 0;
+			memset(g_mp3_play_name, 0, 32);
 		}
-		printf("Hall Counter = %d\n", pluse_num_new);
+
+    	OSTimeDlyHMSM(0,0,0,500);// 500ms
+	}
+}
+
+// MPU6050 Check and BT Data Parse
+void main_task(void *pdata)
+{
+	while(1) {
+		// TBD: Add MPU6050 Check
+		MPU6050_Risk_Check();
+
+		// TBD: Add Invalid Moving Check
+		// TBD: Add BT Data Parse
+    	OSTimeDlyHMSM(0,0,0,500);// 500ms
+	}
+}
+
+//执行最不需要时效性的代码
+void usart_task(void *pdata)
+{
+	u8 loop_cnt = 0;
+
+	while(1) {
+ 	   if((UART5_RX_STA&(1<<15)) != 0) {
+	       cpr74_read_calypso();
+           UART5_RX_STA = 0;
+        }
+
+        if (loop_cnt++ == 3) {
+            loop_cnt = 0;
+            printf("Hall Counter = %d\n", pluse_num_new);
+		}
+
+		OSTimeDlyHMSM(0,0,0,500);// 500ms
+		OSTimeDlyHMSM(0,0,0,500);// 500ms
 	}
 }
 
