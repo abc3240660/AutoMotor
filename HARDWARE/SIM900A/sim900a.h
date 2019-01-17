@@ -109,7 +109,7 @@ enum CMD_TYPE {
  
 #define swap16(x) (x&0XFF)<<8|(x&0XFF00)>>8		//高低字节交换宏定义
 
-u8* sim7500e_check_cmd(u8 *str);
+u8* sim7500e_check_cmd(u8 *str, u8 index);
 u8 sim7500e_send_cmd(u8 *cmd,u8 *ack,u16 waittime);
 u8 sim7500e_chr2hex(u8 chr);
 u8 sim7500e_hex2chr(u8 hex);

@@ -193,7 +193,7 @@ u8 sim7500e_mp3_dw_check(void)
 
 	for (i=0; i<U3_RECV_LEN_ONE; i++) {
 		if ((':' == USART3_RX_BUF_BAK[i]) && (' ' == USART3_RX_BUF_BAK[i+1])) {
-			szie_pos = i + 2;
+//			szie_pos = i + 2;
 		}
 
 		if (i >= size_pos) {
@@ -205,7 +205,7 @@ u8 sim7500e_mp3_dw_check(void)
 			if ((i-size_pos) < 8) {
 				size_str[i-size_pos] = USART3_RX_BUF_BAK[i];
 			} else {
-				printf("DW size is too large!\n")
+				printf("DW size is too large!\n");
 			}
 		}
 	}

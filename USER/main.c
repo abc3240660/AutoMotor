@@ -3,6 +3,8 @@
 #include "common.h"
 #include "usart3.h"
 #include "usart5.h"
+#include "usart6.h"
+#include "blue.h"
 #include "sim900a.h"
 #include "can1.h"
 #include "can2.h"
@@ -85,7 +87,7 @@ void system_init(void)
 	#if 1
 	usart3_init(115200);		//初始化串口3波特率为115200
 	usart5_init(115200);
-
+	usart6_init(9600);	    //串口初始化波特率为9600
  	LED_Init();					//初始化LED 
  	KEY_Init();					//按键初始化 
 
@@ -113,7 +115,7 @@ void system_init(void)
 	TIM2_Init(9999,8399);	
 	TIM4_Init(9999,8399);
 	
-	VS_Init();	  				//初始化VS1053
+	//VS_Init();	  				//初始化VS1053
 	#endif
 	MPU_Init();					//初始化MPU6050
 	delay_ms(200);
@@ -128,7 +130,7 @@ void system_init(void)
 	
  	exfuns_init();// alloc for fats
 	// Call SD_Init internally
-  f_mount(fs[0],"0:",1);
+    f_mount(fs[0],"0:",1);
 	
 	temp=0;	
  	do {
@@ -197,7 +199,7 @@ void start_task(void *pdata)
 	OS_ENTER_CRITICAL();//进入临界区(无法被中断打断)    
  	OSTaskCreate(main_task,(void *)0,(OS_STK*)&MAIN_TASK_STK[MAIN_STK_SIZE-1],MAIN_TASK_PRIO);						   
  	OSTaskCreate(usart_task,(void *)0,(OS_STK*)&USART_TASK_STK[USART_STK_SIZE-1],USART_TASK_PRIO);						   
-	OSTaskCreate(higher_task,(void *)0,(OS_STK*)&HIGHER_TASK_STK[HIGHER_STK_SIZE-1],HIGHER_TASK_PRIO); 					   
+	//OSTaskCreate(higher_task,(void *)0,(OS_STK*)&HIGHER_TASK_STK[HIGHER_STK_SIZE-1],HIGHER_TASK_PRIO); 					   
 	OSTaskCreate(lower_task,(void *)0,(OS_STK*)&LOWER_TASK_STK[LOWER_STK_SIZE-1],LOWER_TASK_PRIO); 					   
 	OSTaskSuspend(START_TASK_PRIO);	//挂起起始任务.
 	OS_EXIT_CRITICAL();	//退出临界区(可以被中断打断)
@@ -351,7 +353,7 @@ void lower_task(void *pdata)
 			g_mp3_play = 0;
 			memset(g_mp3_play_name, 0, 32);
 		}
-
+		
     	OSTimeDlyHMSM(0,0,0,500);// 500ms
 	}
 }
@@ -359,9 +361,11 @@ void lower_task(void *pdata)
 // MPU6050 Check and BT Data Parse
 void main_task(void *pdata)
 {
+	printf("lower_task\r\n");
+	blue_init();
 	while(1) {
 		// TBD: Add MPU6050 Check
-		MPU6050_Risk_Check();
+		//MPU6050_Risk_Check();
 
 		// TBD: Add Invalid Moving Check
 		// TBD: Add BT Data Parse
