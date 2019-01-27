@@ -1,6 +1,9 @@
 #include "can1.h"
 #include "led.h"
 
+extern u8 g_door_state;
+extern u8 g_power_state;
+extern u8 g_drlock_sta_chged;
 /****************************************************************************
 * 名    称: u8 CAN1_Mode_Init(u8 mode)
 * 功    能：CAN初始化
@@ -131,6 +134,44 @@ u8 CAN1_Receive_Msg(u8 *buf)
     CAN_Receive(CAN1, CAN_FIFO0, &RxMessage);//读取数据	
     for(i=0;i<RxMessage.DLC;i++)
     buf[i]=RxMessage.Data[i];  
+
+	// Byte1:
+	// BIT0-door: 0-closed / 1-opened
+	// BIT1-frontdoor: 0-unlocked / 1-locked
+	// BIT2-backdoor: 0-unlocked / 1-locked
+	// BIT3-ShaCheTaBan: 0-Down / 1-Release
+	// BIT4-ACC12: 0-LowLevel / 1-HighLevel
+	// BIT5-ON12: 0-LowLevel / 1-HighLevel
+	// BIT6&7-DangWei: 00-OFF / 01-ACC / 10-ON
+	// Byte2:
+	// BIT0-lamp: 0-OFF / 1-ON
+	// BIT1-ring: 0-OFF / 1-ON
+	if (0x100850C8 == RxMessage.ExtId) {
+		if (0x02 == (RxMessage.Data[0]&0x2)) {// locked
+			if (1 == g_drlock_sta_chged) {
+				g_drlock_sta_chged = 0;
+			}
+		} else {// unlocked
+			if (0 == g_drlock_sta_chged) {
+				g_drlock_sta_chged = 1;
+			}
+		}
+
+		if (0x01 == (RxMessage.Data[0]&0x1)) {// Opened
+			g_door_state = 1;
+		} else {// Closed
+			g_door_state = 0;
+		}
+
+		if (0x20 == (RxMessage.Data[0]&0x20)) {// Power ON
+			g_power_state = 1;
+		} else {// Power OFF
+			g_power_state = 0;
+		}
+
+		g_drlock_sta_chged |= 0x80;
+	}
+
 	return RxMessage.DLC;	
 }
 
@@ -170,7 +211,7 @@ u8 CAN1_CloseDoor(void)
 	return 0;
 }
 
-u8 CAN1_JumpLamp(void)
+u8 CAN1_JumpLamp(u8 times)
 {
 	u8 can1_sendbuf[8]={0x01, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 	
@@ -179,7 +220,7 @@ u8 CAN1_JumpLamp(void)
 	return 0;
 }
 
-u8 CAN1_RingAlarm(void)
+u8 CAN1_RingAlarm(u8 times)
 {
 	u8 can1_sendbuf[8]={0x02, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00};
 	

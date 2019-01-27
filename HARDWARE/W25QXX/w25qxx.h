@@ -31,7 +31,7 @@
 
 extern u16 W25QXX_TYPE;					//定义W25QXX芯片型号		   
 
-#define	W25QXX_CS 			PBout(14)  	//W25QXX的片选信号
+#define	W25QXX_CS 			PGout(8)  	//W25QXX的片选信号
 #define W25QXX_USE_MALLOC	1			//定义是否使用动态内存管理
 
 ////////////////////////////////////////////////////////////////////////////////// 

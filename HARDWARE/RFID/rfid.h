@@ -20,7 +20,7 @@ typedef enum _RET_RFID {
 } RET_RFID;
 
 extern u8 calypso_serial_num[SERIAL_NUM_SIZE+1];
-extern u8 calypso_card_id[CARD_ID_SIZE+1];
+extern u8 g_calypso_card_id[CARD_ID_SIZE+1];
 
 extern RET_RFID cpr74_read_calypso(void);
 

@@ -56,7 +56,13 @@ int fputc(int ch, FILE *f)
 	return ch;
 }
 #endif
- 
+void usart1_send_char(u8 c)
+{
+
+	while(USART_GetFlagStatus(USART1,USART_FLAG_TC)==RESET);
+    USART_SendData(USART1,c);   
+
+}
 #if EN_USART1_RX   //如果使能了接收
 //串口1中断服务程序
 //注意,读取USARTx->SR能避免莫名其妙的错误   	
@@ -117,6 +123,53 @@ void uart_init(u32 bound){
 	
 }
 
+#define SET_GPS_GAP "SET-GPS-GAP="
+#define SET_HBEAT_GAP "SET-HBEAT-GAP="
+#define TRIG_DOOR_OPENED "TRIG-DOOR-OPENED"
+#define TRIG_DOOR_CLOSED "TRIG-DOOR-CLOSED"
+#define TRIG_INVALID_MOVE "TRIG-INVALID-MOVE"
+#define TRIg_bms_charged_timesRTED "TRIG-CHARGE-STARTED"
+#define TRIG_CHARGE_STOPED "TRIG-CHARGE-STOPED"
+#define PLAY_MP3_MUSIC "PLAY-MP3="
+
+extern int g_hbeat_gap;
+extern u8 g_drlock_sta_chged;
+extern u8 g_invaid_move;
+extern u8 g_bms_charged_times;
+extern u8 g_mp3_play;
+extern u8 g_mp3_play_name[32];
+extern int g_gps_trace_gap;
+
+void debug_process(void)
+{
+	if (0 == strncmp((const char*)USART_RX_BUF, SET_GPS_GAP, strlen(SET_GPS_GAP))) {
+		g_hbeat_gap = atoi((const char*)(USART_RX_BUF+strlen(SET_GPS_GAP)));
+	} else if (0 == strncmp((const char*)USART_RX_BUF, SET_HBEAT_GAP, strlen(SET_HBEAT_GAP))) {
+		g_gps_trace_gap = atoi((const char*)(USART_RX_BUF+strlen(SET_HBEAT_GAP)));
+	} else if (0 == strncmp((const char*)USART_RX_BUF, TRIG_DOOR_OPENED, strlen(TRIG_DOOR_OPENED))) {
+		g_drlock_sta_chged = 1;
+		g_drlock_sta_chged |= 0x80; 
+	} else if (0 == strncmp((const char*)USART_RX_BUF, TRIG_DOOR_CLOSED, strlen(TRIG_DOOR_CLOSED))) {
+		g_drlock_sta_chged = 0;
+		g_drlock_sta_chged |= 0x80; 
+	} else if (0 == strncmp((const char*)USART_RX_BUF, TRIG_INVALID_MOVE, strlen(TRIG_INVALID_MOVE))) {
+		g_invaid_move = 1;
+	} else if (0 == strncmp((const char*)USART_RX_BUF, TRIg_bms_charged_timesRTED, strlen(TRIg_bms_charged_timesRTED))) {
+		g_bms_charged_times = 1;
+		g_bms_charged_times |= 0x80; 
+	} else if (0 == strncmp((const char*)USART_RX_BUF, TRIG_CHARGE_STOPED, strlen(TRIG_CHARGE_STOPED))) {
+		g_bms_charged_times = 0;
+		g_bms_charged_times |= 0x80; 
+	} else if (0 == strncmp((const char*)USART_RX_BUF, PLAY_MP3_MUSIC, strlen(PLAY_MP3_MUSIC))) {
+		memset(g_mp3_play_name, 0, 32);
+		strcpy((char*)g_mp3_play_name, (const char*)(USART_RX_BUF+strlen(PLAY_MP3_MUSIC)));
+		// printf("g_mp3_play_name = %s\n", g_mp3_play_name);
+
+		g_mp3_play = 1;
+	}
+
+	USART_RX_STA = 0;
+}
 
 void USART1_IRQHandler(void)                	//串口1中断服务程序
 {
@@ -133,7 +186,10 @@ void USART1_IRQHandler(void)                	//串口1中断服务程序
 			if(USART_RX_STA&0x4000)//接收到了0x0d
 			{
 				if(Res!=0x0a)USART_RX_STA=0;//接收错误,重新开始
-				else USART_RX_STA|=0x8000;	//接收完成了 
+				else {
+					USART_RX_STA|=0x8000;	//接收完成了 
+					debug_process();
+				}
 			}
 			else //还没收到0X0D
 			{	

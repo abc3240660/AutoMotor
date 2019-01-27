@@ -21,7 +21,7 @@ extern UINT br;
 
 unsigned char mp3Play(const char* mp3name)
 {
-	u8 res,i;
+	u8 res;
 	FIL file;
 	
 	res = f_open(&file, mp3name, FA_READ);
@@ -75,7 +75,7 @@ void mp3_play(const char* mp3name)
 	}	  	 		  	    
 }
 
-void music_play(void)
+void music_play(const char* mp3name)
 {
 	VS_HD_Reset();
 	VS_Soft_Reset();

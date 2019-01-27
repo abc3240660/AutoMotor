@@ -9,6 +9,8 @@ extern u8 ov_frame;
 extern volatile u16 jpeg_data_len;
 extern void usbapp_pulling(void); 
 
+void write_logs(char *module, char *log, u16 size, u8 mode);
+
 vu8 framecnt;
 vu8 framecntout;
 
@@ -16,7 +18,6 @@ void TIM2_Init(u16 auto_data,u16 fractional)
 {
         GPIO_InitTypeDef GPIO_InitStructure;
         TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStructure;
-        TIM_ICInitTypeDef TIM_ICInitStructure;
         
         RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA,ENABLE);
         RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2,ENABLE);
@@ -52,7 +53,7 @@ void TIM2_IRQHandler(void)
 	if(TIM_GetITStatus(TIM3,TIM_IT_Update)==SET) //溢出中断
 	{
 
-		LED0=!LED0;//LED1翻转
+		//LED0=!LED0;//LED0翻转
   	
 	}
 	TIM_ClearITPendingBit(TIM3,TIM_IT_CC3|TIM_IT_Update);  //清除中断标志位
@@ -75,7 +76,7 @@ void TIM4_IRQHandler(void)
 	}
 	if(TIM_GetITStatus(TIM4, TIM_IT_CC3) != RESET)//捕获1发生捕获事件
 	{
-		LED1=!LED1;//LED1翻转
+		// LED1=!LED1;//LED1翻转
 		capture1= TIM_GetCapture3(TIM4)/10;
 		total_msTtemp+=capture1;
 		total_msTtemp-=capture2;
@@ -339,20 +340,21 @@ void TIM9_CH2_PWM_Init(u16 arr,u16 psc)
 }  
 extern vu16 UART5_RX_STA;
 void TIM6_DAC_IRQHandler(void)
-{ 		
-	u8 i = 0;
+{
 	OSIntEnter();    		    
 	if(TIM_GetITStatus(TIM6,TIM_IT_Update)==SET)
 	{ 
-		UART5_RX_STA|=1<<15;
-		UART5_RX_BUF[UART5_RX_STA&0X7FFF]=0;
-		//printf("RFID RECVED:");
-		//for (i=0; i<(UART5_RX_STA&0X7FFF); i++) {
-		//	printf("%.2X ", UART5_RX_BUF[i]);
-		//}
-		//printf("\n");
+		if (UART5_RX_STA != 0) {
+			UART5_RX_STA|=1<<15;
+			UART5_RX_BUF[UART5_RX_STA&0X7FFF]=0;
+			//printf("RFID RECVED:");
+			//for (i=0; i<(UART5_RX_STA&0X7FFF); i++) {
+			//	printf("%.2X ", UART5_RX_BUF[i]);
+			//}
+			//printf("\n");
+		}
+
 		TIM_ClearITPendingBit(TIM6,TIM_IT_Update);
-   
 		TIM_Cmd(TIM6,DISABLE);
 	}				   
 	OSIntExit();  											 
@@ -380,17 +382,28 @@ void TIM6_Int_Init(u16 arr,u16 psc)
 	NVIC_InitStructure.NVIC_IRQChannelCmd=ENABLE;
 	NVIC_Init(&NVIC_InitStructure); 									 
 }
-extern vu16 USART3_RX_STA;
+extern u8 U3_RX_ID;// 0~3
+extern vu16 USART3_RX_STA[4];
+extern void USART3_Get_Free_Buf(void);
 void TIM7_IRQHandler(void)
 { 	
 	OSIntEnter();    		    
 	if(TIM_GetITStatus(TIM7,TIM_IT_Update)==SET)
 	{	 			   
-		USART3_RX_STA|=1<<15;
-		USART3_RX_BUF[USART3_RX_STA&0X7FFF]=0;
-		printf("SIM7K RECVED: %s\n", USART3_RX_BUF);
+		if (USART3_RX_STA[U3_RX_ID] != 0) {
+			USART3_RX_STA[U3_RX_ID] |= 1<<15;
+			USART3_RX_BUF[U3_RECV_LEN_ONE*U3_RX_ID + USART3_RX_STA[U3_RX_ID]&0X7FFF] = 0;
+			//printf("SIM7K RECVED: %s\n", USART3_RX_BUF+U3_RECV_LEN_ONE*U3_RX_ID);
+			//printf("SIM7000E Recv Data %s\n", USART3_RX_BUF+U3_RECV_LEN_ONE*U3_RX_ID);
+			//write_logs("SIM7000E", (char*)USART3_RX_BUF+U3_RECV_LEN_ONE*U3_RX_ID, USART3_RX_STA[U3_RX_ID]&0X7FFF, 0);
+
+			// Not Busy:    0->1->0->1->0->1->... (always switch between 0 and 1)
+			// little Busy: 0->1->2->0->1->0->1->... (may use till 2)
+			// very Busy:   0->1->2->3->0->1->0->1->... (may use till 3)
+			USART3_Get_Free_Buf();// Get first free buf id for next use
+		}
+
 		TIM_ClearITPendingBit(TIM7,TIM_IT_Update);
-   
 		TIM_Cmd(TIM7,DISABLE);
 	}	    
 	OSIntExit();  											 

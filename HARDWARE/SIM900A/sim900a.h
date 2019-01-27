@@ -6,6 +6,7 @@
 
 typedef struct 
 {							  
+	u8 tcp_status;// 0-idle, 1-Connect OK, 2-Connect Failed/Error
  	u8 status;		//SIM7500EA状态
 					//bit7:0,没有找到模块;1,找到模块了
 					//bit6:0,SIM卡不正常;1,SIM卡正常
@@ -41,51 +42,81 @@ extern __sim7500dev sim7500dev;	//sim900控制器
 
 #define CMD_DEV_ACK		"Re"// DEV ACK
 
-#define CMD_DEV_REGISTER	"R0"// DEV CMD
-#define CMD_HEART_BEAT		"H0"// DEV CMD
-#define CMD_INQUIRE_PARAM	"C0"// DEV ACK
-#define CMD_RING_ALARM		"R2"// DEV ACK
-#define CMD_OPEN_DOOR		"O0"// DEV ACK
-#define CMD_DOOR_CLOSED		"C1"// DEV CMD
-#define CMD_CLOSE_DOOR		"G0"// DEV ACK
-#define CMD_JUMP_LAMP		"S2"// DEV ACK
-#define CMD_CALYPSO_UPLOAD	"C3"// DEV CMD
-#define CMD_ENGINE_START	"E0"// DEV CMD
+// F407 Send to Server automatically
+#define CMD_DEV_REGISTER	"R0"// DEV Host
+#define CMD_HEART_BEAT		"H0"// DEV Host
+#define CMD_DOOR_LOCKED		"C1"// DEV Host
+#define CMD_DOOR_UNLOCKED		"O1"// DEV Host
+#define CMD_CALYPSO_UPLOAD	"C3"// DEV Host
+#define CMD_INVALID_MOVE	"W1"// DEV Host
+#define CMD_REPORT_GPS		"L1"// DEV Host
+#define CMD_IAP_SUCCESS		"U1"// DEV Host
+#define CMD_CHARGE_STARTED	"B1"// DEV Host
+#define CMD_CHARGE_STOPED	"B3"// DEV Host
 
-#define LEN_SYS_TIME	32
-#define LEN_IMEI_NO	32
-#define LEN_BAT_VOL	32
-#define LEN_RSSI_VAL	32
-#define LEN_MAX_SEND	32
-#define LEN_MAX_RECV	32
+// F407 Recv from Server and Action / ACK
+#define CMD_QUERY_PARAMS	"C0"// DEV ACK
+#define CMD_RING_ALARM		"R2"// DEV ACK
+#define CMD_UNLOCK_DOOR		"O0"// DEV ACK
+#define CMD_JUMP_LAMP		"S2"// DEV ACK
+#define CMD_ENGINE_START	"E0"// DEV ACK
+#define CMD_DEV_SHUTDOWN    "S0"// DEV ACK
+#define CMD_QUERY_GPS   	"L0"// DEV ACK
+#define CMD_IAP_UPGRADE   	"U0"// DEV ACK
+#define CMD_MP3_UPDATE  	"U2"// DEV ACK
+#define CMD_MP3_PLAY    	"P0"// DEV ACK
+#define CMD_START_TRACE   	"T0"// DEV ACK
+#define CMD_STOP_TRACE   	"T2"// DEV ACK
+#define CMD_QUERY_BMS   	"B0"// DEV ACK
+#define CMD_QUERY_MP3   	"P2"// DEV ACK
+
+#define LEN_SYS_TIME    32
+#define LEN_IMEI_NO     32
+#define LEN_BAT_VOL     32
+#define LEN_RSSI_VAL    32
+#define LEN_MAX_SEND    128
+#define LEN_MAX_RECV    32
 
 #define DEBUG_USE 1
 
 enum CMD_TYPE {
 	DEV_REGISTER = 0,
 	HEART_BEAT,
-	INQUIRE_PARAM,
+	QUERY_PARAMS,
 	RING_ALARM,
-	OPEN_DOOR,
-	DOOR_CLOSED,
+	UNLOCK_DOOR,
+	DOOR_LOCKED,
+	DOOR_UNLOCKED,
 	JUMP_LAMP,
 	CALYPSO_UPLOAD,
 	ENGINE_START,
-	CLOSE_DOOR,
+	INVALID_MOVE,
+	REPORT_GPS,
+	IAP_SUCCESS,
+	CHARGE_STARTED,
+	CHARGE_STOPED,
+	DEV_SHUTDOWN,
+	QUERY_GPS,
+	IAP_UPGRADE,
+	MP3_UPDATE,
+	MP3_PLAY,
+	START_TRACE,
+	STOP_TRACE,
+	QUERY_BMS,
+	QUERY_MP3,
 	UNKNOWN_CMD
 };
  
 #define swap16(x) (x&0XFF)<<8|(x&0XFF00)>>8		//高低字节交换宏定义
 
-u8* sim7500e_check_cmd(u8 *str);
+u8* sim7500e_check_cmd(u8 *str, u8 index);
 u8 sim7500e_send_cmd(u8 *cmd,u8 *ack,u16 waittime);
-void sim7500e_cmd_over(void);
 u8 sim7500e_chr2hex(u8 chr);
 u8 sim7500e_hex2chr(u8 hex);
 void sim7500e_unigbk_exchange(u8 *src,u8 *dst,u8 mode);
 void sim7500e_cmsgin_check(void);
 void sim7500e_status_check(void);
-void sim7500e_tcp_connect(u8 mode,u8* ipaddr,u8* port);
+void sim7500e_communication_loop(u8 mode,u8* ipaddr,u8* port);
 
 #endif/* __SIM7500E_H__ */
 

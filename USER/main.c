@@ -3,13 +3,18 @@
 #include "common.h"
 #include "usart3.h"
 #include "usart5.h"
+#include "usart6.h"
+#include "blue.h"
 #include "sim900a.h"
 #include "can1.h"
 #include "can2.h"
 #include "rfid.h"
 #include "vs10xx.h"
 #include "mp3play.h"
-
+#include "rtc.h"
+#include "mpu6050.h"
+#include "inv_mpu.h"
+#include "inv_mpu_dmp_motion_driver.h"
 /////////////////////////UCOSII任务设置///////////////////////////////////
 //START 任务
 //设置任务优先级
@@ -21,6 +26,11 @@ __align(8) static OS_STK START_TASK_STK[START_STK_SIZE];
 //任务函数
 void start_task(void *pdata);	
  			   
+#define LOWER_TASK_PRIO       			7
+#define LOWER_STK_SIZE  		    	128
+__align(8) static OS_STK LOWER_TASK_STK[LOWER_STK_SIZE];
+void lower_task(void *pdata);	
+
 //串口任务
 //设置任务优先级
 #define USART_TASK_PRIO       			7 
@@ -43,36 +53,58 @@ void main_task(void *pdata);
 
 //监视任务
 //设置任务优先级
-#define WATCH_TASK_PRIO       			3 
+#define HIGHER_TASK_PRIO       			3 
 //设置任务堆栈大小
-#define WATCH_STK_SIZE  		   		256
+#define HIGHER_STK_SIZE  		   		256
 //任务堆栈，8字节对齐	
-__align(8) static OS_STK WATCH_TASK_STK[WATCH_STK_SIZE];
+__align(8) static OS_STK HIGHER_TASK_STK[HIGHER_STK_SIZE];
 //任务函数
-void watch_task(void *pdata);
+void higher_task(void *pdata);
 //////////////////////////////////////////////////////////////////////////////	 
 
 int total_ms=0;
 extern int pluse_num_new;
+int g_sd_existing = 0;
+
+OS_EVENT * sem_beep;
+u8 g_logname[64] = "";
+u8 g_logmsg[256] = "";
+
+void create_logfile(void);
+void write_logs(char *module, char *log, u16 size, u8 mode);
+
+u8 g_mp3_play = 0;
+u8 g_mp3_play_name[32] = "";
 //////////////////////////////////////////////////////////////////////////////	 
 
 //系统初始化
 void system_init(void)
 {
-	u8 res;
-	u16 temp=0;
-	u32 dtsize,dfsize;
 	u8 CAN1_mode=0; //CAN工作模式;0,普通模式;1,环回模式
 	u8 CAN2_mode=0; //CAN工作模式;0,普通模式;1,环回模式	
-	
 	delay_init(168);			//延时初始化  
 	uart_init(115200);		//初始化串口波特率为115200
+	#if 1
 	usart3_init(115200);		//初始化串口3波特率为115200
-	usart5_init(38400);
+	usart5_init(115200);
+	usart6_init(9600);	    //串口初始化波特率为9600
  	LED_Init();					//初始化LED 
  	KEY_Init();					//按键初始化 
-//	W25QXX_Init();				//初始化W25Q128
 
+#if 0
+	W25QXX_Init();				//初始化W25Q128
+
+	g_sys_env.charge_times = 123;
+	
+	sys_env_init();
+
+	// Get g_bms_charged_times
+	sys_env_dump();
+#endif
+
+	My_RTC_Init();		 		//初始化RTC
+	RTC_Set_WakeUp(RTC_WakeUpClock_CK_SPRE_16bits,0);		//配置WAKE UP中断,1秒钟中断一次
+		
 	printf("SmartMotor Starting...\n");
 	CAN1_Mode_Init(CAN1_mode);//CAN初始化普通模式,波特率250Kbps
 	CAN2_Mode_Init(CAN2_mode);//CAN初始化普通模式,波特率500Kbps 
@@ -83,13 +115,22 @@ void system_init(void)
 	TIM2_Init(9999,8399);	
 	TIM4_Init(9999,8399);
 	
-	VS_Init();	  				//初始化VS1053
-	
+	//VS_Init();	  				//初始化VS1053
+	#endif
+	MPU_Init();					//初始化MPU6050
+	delay_ms(200);
+	while(mpu_dmp_init())
+	{
+ 		delay_ms(200);
+		usart1_send_char('K');
+	}
+	//mpu_dmp_init();
+#if 0	
 	delay_ms(1500);
 	
  	exfuns_init();// alloc for fats
 	// Call SD_Init internally
-  f_mount(fs[0],"0:",1);
+    f_mount(fs[0],"0:",1);
 	
 	temp=0;	
  	do {
@@ -99,10 +140,13 @@ void system_init(void)
 	} while(res&&temp<5);
 	
  	if(res==0) {
+		g_sd_existing = 1;
 		printf("Read SD OK!\r\n");
 	} else {
 		printf("Read SD Failed!\r\n");
 	}
+	
+	create_logfile();
 	
 #if 0
 	u16 xx = 0;
@@ -114,20 +158,30 @@ void system_init(void)
 	while(1)
 	{
 		delay_ms(1000);
- 		LED1=0; 	   
+ 		//LED1=0; 	   
  		VS_Sine_Test();	   	 
 		delay_ms(1000);
-		LED1=1;
+		//LED1=1;
 	}
 #endif
+#endif
 }   
+
+void SoftReset(void)
+{  
+	while (1) {
+		delay_ms(1000);
+	}
+	__set_FAULTMASK(1);
+ 	NVIC_SystemReset();
+}
 
 //main函数	  					
 int main(void)
 { 	
-	SCB->VTOR = *((u32 *)0x0800FFF8);
+//	SCB->VTOR = *((u32 *)0x0800FFF8);
 	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);//设置系统中断优先级分组2
-  system_init();		//系统初始化 
+	system_init();		//系统初始化
  	OSInit();   
  	OSTaskCreate(start_task,(void *)0,(OS_STK *)&START_TASK_STK[START_STK_SIZE-1],START_TASK_PRIO );//创建起始任务
 	OSStart();	  						    
@@ -138,92 +192,214 @@ void start_task(void *pdata)
 {  
 	OS_CPU_SR cpu_sr=0;
 	pdata = pdata; 	   
+	sem_beep=OSSemCreate(1);
 	OSStatInit();		//初始化统计任务.这里会延时1秒钟左右	
 // 	app_srand(OSTime);
-	
+
 	OS_ENTER_CRITICAL();//进入临界区(无法被中断打断)    
  	OSTaskCreate(main_task,(void *)0,(OS_STK*)&MAIN_TASK_STK[MAIN_STK_SIZE-1],MAIN_TASK_PRIO);						   
  	OSTaskCreate(usart_task,(void *)0,(OS_STK*)&USART_TASK_STK[USART_STK_SIZE-1],USART_TASK_PRIO);						   
-	OSTaskCreate(watch_task,(void *)0,(OS_STK*)&WATCH_TASK_STK[WATCH_STK_SIZE-1],WATCH_TASK_PRIO); 					   
+	//OSTaskCreate(higher_task,(void *)0,(OS_STK*)&HIGHER_TASK_STK[HIGHER_STK_SIZE-1],HIGHER_TASK_PRIO); 					   
+	OSTaskCreate(lower_task,(void *)0,(OS_STK*)&LOWER_TASK_STK[LOWER_STK_SIZE-1],LOWER_TASK_PRIO); 					   
 	OSTaskSuspend(START_TASK_PRIO);	//挂起起始任务.
 	OS_EXIT_CRITICAL();	//退出临界区(可以被中断打断)
 } 
-	
-//主任务
+
+void create_logfile(void)
+{
+	if (0 == g_sd_existing) {
+		return;
+	} else {
+		u8 res;
+		FIL f_txt;
+		RTC_TimeTypeDef RTC_TimeStruct;
+		RTC_DateTypeDef RTC_DateStruct;
+		
+		RTC_GetTime(RTC_Format_BIN,&RTC_TimeStruct);
+		RTC_GetDate(RTC_Format_BIN, &RTC_DateStruct);
+		
+		sprintf((char*)g_logname,"0:/LOG/20%02d%02d%02d_%02d%02d%02d.log",RTC_DateStruct.RTC_Year,RTC_DateStruct.RTC_Month,RTC_DateStruct.RTC_Date,RTC_TimeStruct.RTC_Hours,RTC_TimeStruct.RTC_Minutes,RTC_TimeStruct.RTC_Seconds);
+		
+		res = f_open(&f_txt,(const TCHAR*)g_logname,FA_READ|FA_WRITE|FA_CREATE_ALWAYS);
+		if (0 == res) {
+			f_close(&f_txt);
+		}
+	}
+}
+
+void write_logs(char *module, char *log, u16 size, u8 mode)
+{
+	if (0 == g_sd_existing) {
+		return;
+	} else {
+		u8 err;
+		u8 res;
+		u32 br;
+		//char log_buf[] = "hello log"; 
+		FIL f_txt;
+		RTC_TimeTypeDef RTC_TimeStruct;
+		
+		RTC_GetTime(RTC_Format_BIN,&RTC_TimeStruct);
+		
+		memset(g_logmsg, 0, 256);
+		
+		if (0 == mode) {
+			sprintf((char*)g_logmsg,"%02d%02d%02d:RECV Data(%s) %s\n",RTC_TimeStruct.RTC_Hours,RTC_TimeStruct.RTC_Minutes,RTC_TimeStruct.RTC_Seconds,module,log);
+		} else if (1 == mode) {
+			sprintf((char*)g_logmsg,"%02d%02d%02d:SEND Data(%s) %s\n",RTC_TimeStruct.RTC_Hours,RTC_TimeStruct.RTC_Minutes,RTC_TimeStruct.RTC_Seconds,module,log);
+		} else if (2 == mode) {
+			sprintf((char*)g_logmsg,"%02d%02d%02d:IMPT Data(%s) %s\n",RTC_TimeStruct.RTC_Hours,RTC_TimeStruct.RTC_Minutes,RTC_TimeStruct.RTC_Seconds,module,log);
+		} else {
+			sprintf((char*)g_logmsg,"%02d%02d%02d:OTHR Data(%s) %s\n",RTC_TimeStruct.RTC_Hours,RTC_TimeStruct.RTC_Minutes,RTC_TimeStruct.RTC_Seconds,module,log);
+		}
+		
+		printf("%s", g_logmsg);
+		
+		OSSemPend(sem_beep,0,&err);
+		res = f_open(&f_txt,(const TCHAR*)g_logname,FA_READ|FA_WRITE);
+		if(res==0)
+		{			
+			f_lseek(&f_txt, f_txt.fsize);
+			f_write(&f_txt,g_logmsg, strlen((const char*)g_logmsg), (UINT*)&br);
+			f_close(&f_txt);
+		}
+		OSSemPost(sem_beep);
+	}
+}
+//传送数据给匿名四轴上位机软件(V2.6版本)
+//fun:功能字. 0XA0~0XAF
+//data:数据缓存区,最多28字节!!
+//len:data区有效数据个数
+void usart1_niming_report(u8 fun,u8*data,u8 len)
+{
+	u8 send_buf[32];
+	u8 i;
+	if(len>28)return;	//最多28字节数据 
+	send_buf[len+3]=0;	//校验数置零
+	send_buf[0]=0X88;	//帧头
+	send_buf[1]=fun;	//功能字
+	send_buf[2]=len;	//数据长度
+	for(i=0;i<len;i++)send_buf[3+i]=data[i];			//复制数据
+	for(i=0;i<len+3;i++)send_buf[len+3]+=send_buf[i];	//计算校验和	
+	for(i=0;i<len+4;i++)usart1_send_char(send_buf[i]);	//发送数据到串口1 
+}
+//通过串口1上报结算后的姿态数据给电脑
+//aacx,aacy,aacz:x,y,z三个方向上面的加速度值
+//gyrox,gyroy,gyroz:x,y,z三个方向上面的陀螺仪值
+//roll:横滚角.单位0.01度。 -18000 -> 18000 对应 -180.00  ->  180.00度
+//pitch:俯仰角.单位 0.01度。-9000 - 9000 对应 -90.00 -> 90.00 度
+//yaw:航向角.单位为0.1度 0 -> 3600  对应 0 -> 360.0度
+void usart1_report_imu(short aacx,short aacy,short aacz,short gyrox,short gyroy,short gyroz,short roll,short pitch,short yaw)
+{
+	u8 tbuf[28]; 
+	u8 i;
+	for(i=0;i<28;i++)tbuf[i]=0;//清0
+	tbuf[0]=(aacx>>8)&0XFF;
+	tbuf[1]=aacx&0XFF;
+	tbuf[2]=(aacy>>8)&0XFF;
+	tbuf[3]=aacy&0XFF;
+	tbuf[4]=(aacz>>8)&0XFF;
+	tbuf[5]=aacz&0XFF; 
+	tbuf[6]=(gyrox>>8)&0XFF;
+	tbuf[7]=gyrox&0XFF;
+	tbuf[8]=(gyroy>>8)&0XFF;
+	tbuf[9]=gyroy&0XFF;
+	tbuf[10]=(gyroz>>8)&0XFF;
+	tbuf[11]=gyroz&0XFF;	
+	tbuf[18]=(roll>>8)&0XFF;
+	tbuf[19]=roll&0XFF;
+	tbuf[20]=(pitch>>8)&0XFF;
+	tbuf[21]=pitch&0XFF;
+	tbuf[22]=(yaw>>8)&0XFF;
+	tbuf[23]=yaw&0XFF;
+	usart1_niming_report(0XAF,tbuf,28);//飞控显示帧,0XAF
+} 
+
+void MPU6050_Risk_Check()
+{
+	u8 ret = 0;
+	float pitch,roll,yaw; 		//欧拉角
+	short aacx,aacy,aacz;		//加速度传感器原始数据
+	short gyrox,gyroy,gyroz;	//陀螺仪原始数据
+	short temp;					//温度
+
+	ret = mpu_dmp_get_data(&pitch,&roll,&yaw);
+	usart1_send_char(ret);
+
+	if (ret == 0) {
+		temp=MPU_Get_Temperature();	//得到温度值
+		MPU_Get_Accelerometer(&aacx,&aacy,&aacz);	//得到加速度传感器数据
+		MPU_Get_Gyroscope(&gyrox,&gyroy,&gyroz);	//得到陀螺仪数据
+		//mpu6050_send_data(aacx,aacy,aacz,gyrox,gyroy,gyroz);//用自定义帧发送加速度和陀螺仪原始数据
+#if 0
+		usart1_report_imu(aacx,aacy,aacz,gyrox,gyroy,gyroz,(int)(roll*100),(int)(pitch*100),(int)(yaw*10));
+#else
+		//printf(" (int)(roll*100)=%d ,(int)(pitch*100)=%d ,(int)(yaw*10)=%d \r\n",(int)(roll*100),(int)(pitch*100),(int)(yaw*10));
+		if((pitch*100>4500)||(pitch*100<-4500)||(yaw*10>450)||(yaw*10<-450))
+			printf("FCL \r\n");
+		else
+			printf("MFC \r\n");
+#endif
+	}
+}
+
+// Play MP3 task
+void lower_task(void *pdata)
+{
+	while(1) {
+		if (g_mp3_play) {
+			music_play((const char*)g_mp3_play_name);
+
+			g_mp3_play = 0;
+			memset(g_mp3_play_name, 0, 32);
+		}
+		
+    	OSTimeDlyHMSM(0,0,0,500);// 500ms
+	}
+}
+
+// MPU6050 Check and BT Data Parse
 void main_task(void *pdata)
 {
-//	while(1) {
-//		u3_printf("Hello Uart3 TTL\n");
-//		sim900a_send_cmd("AT","OK",100);
-//		delay_ms(1000);
-//	}
-	sim7500e_tcp_connect(0,NULL,NULL);
-//	delay_ms(5000);
-//	cpr74_read_calypso();
+	printf("lower_task\r\n");
+	blue_init();
+	while(1) {
+		// TBD: Add MPU6050 Check
+		//MPU6050_Risk_Check();
+
+		// TBD: Add Invalid Moving Check
+		// TBD: Add BT Data Parse
+    	OSTimeDlyHMSM(0,0,0,500);// 500ms
+	}
 }
 
 //执行最不需要时效性的代码
 void usart_task(void *pdata)
-{	 
-	u8 res;
-	u32 br;
-	char log_buf[] = "hello log"; 
-	FIL f_txt;
-	
-	delay_ms(2000);
-	delay_ms(2000);
-	delay_ms(2000);
-	
+{
+	u8 loop_cnt = 0;
+
 	while(1) {
-		delay_ms(3000);
-		cpr74_read_calypso();
-		
-		printf("Hall Counter = %d\n", pluse_num_new);
-/*
-		res=f_open(&f_txt,(const TCHAR*)"0:/test01.txt",FA_READ|FA_WRITE);
-		if(res==0)
-		{
-			f_lseek(&f_txt,0);
-			f_write(&f_txt,log_buf,strlen((const char*)log_buf),(UINT*)&br);
-			f_close(&f_txt);
+ 	   if((UART5_RX_STA&(1<<15)) != 0) {
+	       cpr74_read_calypso();
+           UART5_RX_STA = 0;
+        }
+
+        if (loop_cnt++ == 3) {
+            loop_cnt = 0;
+            printf("Hall Counter = %d\n", pluse_num_new);
 		}
-*/
+
+		OSTimeDlyHMSM(0,0,0,500);// 500ms
+		OSTimeDlyHMSM(0,0,0,500);// 500ms
 	}
 }
 
 //监视任务
-void watch_task(void *pdata)
+void higher_task(void *pdata)
 {
-	u8 key;
-  OS_CPU_SR cpu_sr=0; 
-	
-	while(1)
-	{
-		// TBD to check Why
-		// Only K3(=WKUP) is useful
-		key=KEY_Scan(0);
-	  if(key)
-		{						   
-			switch(key)
-			{				 
-				case WKUP_PRES:
-					LED0=!LED0;
-					LEDX=!LEDX;
-					break;
-				case KEY0_PRES:
-					LED0=!LED0;
-					LEDX=!LEDX;
-					break;
-				case KEY1_PRES:
-					LED1=!LED1;
-					break;
-				case KEY2_PRES:
-					LED0=!LED0;
-					LED1=!LED1;
-					break;
-			}
-		}else delay_ms(10);
-    OSTimeDlyHMSM(0,0,0,10);
+	while (1) {
+		sim7500e_communication_loop(0,NULL,NULL);
+    	OSTimeDlyHMSM(0,0,0,500);// 500ms
 	}
 }
 
@@ -241,11 +417,11 @@ void HardFault_Handler(void)
  	printf("DFSR:%8X\r\n",temp);	//显示错误值
    	temp=SCB->AFSR;					//辅助fault状态寄存器
  	printf("AFSR:%8X\r\n",temp);	//显示错误值
- 	LED1=!LED1;
+ 	// LED1=!LED1;
  	while(t<5)
 	{
 		t++;
-		LED0=!LED0;
+		LED2=!LED2;
 		//BEEP=!BEEP;
 		for(i=0;i<0X1FFFFF;i++);
  	}
