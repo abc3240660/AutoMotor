@@ -74,7 +74,7 @@ extern __sim7500dev sim7500dev;	//sim900¿ØÖÆÆ÷
 #define LEN_IMEI_NO     32
 #define LEN_BAT_VOL     32
 #define LEN_RSSI_VAL    32
-#define LEN_MAX_SEND    128
+#define LEN_MAX_SEND    256
 #define LEN_MAX_RECV    32
 
 #define DEBUG_USE 1

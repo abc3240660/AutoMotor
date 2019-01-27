@@ -387,13 +387,29 @@ extern vu16 USART3_RX_STA[4];
 extern void USART3_Get_Free_Buf(void);
 void TIM7_IRQHandler(void)
 { 	
+	u8 i = 0;
+	
 	OSIntEnter();    		    
 	if(TIM_GetITStatus(TIM7,TIM_IT_Update)==SET)
 	{	 			   
 		if (USART3_RX_STA[U3_RX_ID] != 0) {
 			USART3_RX_STA[U3_RX_ID] |= 1<<15;
 			USART3_RX_BUF[U3_RECV_LEN_ONE*U3_RX_ID + USART3_RX_STA[U3_RX_ID]&0X7FFF] = 0;
-			//printf("SIM7K RECVED: %s\n", USART3_RX_BUF+U3_RECV_LEN_ONE*U3_RX_ID);
+			
+#if 1
+			printf("+++SIM7K RECVED(%dB):", USART3_RX_STA[U3_RX_ID]&0X7FFF);
+			
+			for (i=0; i<64; i++) {
+				if (0 == USART3_RX_BUF[U3_RECV_LEN_ONE*U3_RX_ID+i]) {
+					break;
+				}
+				printf("%c", USART3_RX_BUF[U3_RECV_LEN_ONE*U3_RX_ID+i]);
+			}
+			printf("---\n");
+#endif
+	
+			//printf("SIM7K RECVED(%dB)\n", USART3_RX_STA[U3_RX_ID]&0X7FFF);
+			//printf("SIM7K RECVED(%dB): %s\n", USART3_RX_STA[U3_RX_ID]&0X7FFF, USART3_RX_BUF+U3_RECV_LEN_ONE*U3_RX_ID);
 			//printf("SIM7000E Recv Data %s\n", USART3_RX_BUF+U3_RECV_LEN_ONE*U3_RX_ID);
 			//write_logs("SIM7000E", (char*)USART3_RX_BUF+U3_RECV_LEN_ONE*U3_RX_ID, USART3_RX_STA[U3_RX_ID]&0X7FFF, 0);
 

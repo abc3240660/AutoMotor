@@ -56,13 +56,7 @@ int fputc(int ch, FILE *f)
 	return ch;
 }
 #endif
-void usart1_send_char(u8 c)
-{
-
-	while(USART_GetFlagStatus(USART1,USART_FLAG_TC)==RESET);
-    USART_SendData(USART1,c);   
-
-}
+ 
 #if EN_USART1_RX   //如果使能了接收
 //串口1中断服务程序
 //注意,读取USARTx->SR能避免莫名其妙的错误   	
@@ -135,7 +129,7 @@ void uart_init(u32 bound){
 extern int g_hbeat_gap;
 extern u8 g_drlock_sta_chged;
 extern u8 g_invaid_move;
-extern u8 g_bms_charged_times;
+extern u8 g_bms_charge_sta_chged;
 extern u8 g_mp3_play;
 extern u8 g_mp3_play_name[32];
 extern int g_gps_trace_gap;
@@ -143,9 +137,11 @@ extern int g_gps_trace_gap;
 void debug_process(void)
 {
 	if (0 == strncmp((const char*)USART_RX_BUF, SET_GPS_GAP, strlen(SET_GPS_GAP))) {
-		g_hbeat_gap = atoi((const char*)(USART_RX_BUF+strlen(SET_GPS_GAP)));
+		g_gps_trace_gap = atoi((const char*)(USART_RX_BUF+strlen(SET_GPS_GAP)));
+		printf("g_gps_trace_gap = %d\n", g_gps_trace_gap);
 	} else if (0 == strncmp((const char*)USART_RX_BUF, SET_HBEAT_GAP, strlen(SET_HBEAT_GAP))) {
-		g_gps_trace_gap = atoi((const char*)(USART_RX_BUF+strlen(SET_HBEAT_GAP)));
+		g_hbeat_gap = atoi((const char*)(USART_RX_BUF+strlen(SET_HBEAT_GAP)));
+		printf("g_hbeat_gap = %d\n", g_hbeat_gap);
 	} else if (0 == strncmp((const char*)USART_RX_BUF, TRIG_DOOR_OPENED, strlen(TRIG_DOOR_OPENED))) {
 		g_drlock_sta_chged = 1;
 		g_drlock_sta_chged |= 0x80; 
@@ -155,11 +151,11 @@ void debug_process(void)
 	} else if (0 == strncmp((const char*)USART_RX_BUF, TRIG_INVALID_MOVE, strlen(TRIG_INVALID_MOVE))) {
 		g_invaid_move = 1;
 	} else if (0 == strncmp((const char*)USART_RX_BUF, TRIg_bms_charged_timesRTED, strlen(TRIg_bms_charged_timesRTED))) {
-		g_bms_charged_times = 1;
-		g_bms_charged_times |= 0x80; 
+		g_bms_charge_sta_chged = 1;
+		g_bms_charge_sta_chged |= 0x80; 
 	} else if (0 == strncmp((const char*)USART_RX_BUF, TRIG_CHARGE_STOPED, strlen(TRIG_CHARGE_STOPED))) {
-		g_bms_charged_times = 0;
-		g_bms_charged_times |= 0x80; 
+		g_bms_charge_sta_chged = 0;
+		g_bms_charge_sta_chged |= 0x80; 
 	} else if (0 == strncmp((const char*)USART_RX_BUF, PLAY_MP3_MUSIC, strlen(PLAY_MP3_MUSIC))) {
 		memset(g_mp3_play_name, 0, 32);
 		strcpy((char*)g_mp3_play_name, (const char*)(USART_RX_BUF+strlen(PLAY_MP3_MUSIC)));

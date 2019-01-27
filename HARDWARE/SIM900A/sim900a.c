@@ -43,6 +43,7 @@ u8 g_calypso_active = 0;
 // BT(if no BT, use SIM)
 u8 g_mac_addr[32] = "";
 u8 g_iccid_sim[32] = "";
+u8 g_rssi_sim[32] = "";
 
 u8 g_bms_temp_max = 30;// 30
 u8 g_bms_temp_min = 30;// 30
@@ -55,7 +56,13 @@ u8 gps_temp_dat3[32] = "";
 u8 gps_temp_dat4[32] = "";
 u8 gps_temp_dat5[32] = "";
 
+u16 g_need_ack1 = 0;
+u16 g_need_ack2 = 0;
+
+u8 g_hbeaterrcnt = 0;			//心跳错误计数器,连续5次心跳信号无应答,则重新连接
+
 u8 USART3_RX_BUF_BAK[U3_RECV_LEN_ONE];
+u8 USART3_RX_BUF_BAK_MOBIT[U3_RECV_LEN_ONE];
 
 void SoftReset(void);
 void write_logs(char *module, char *log, u16 size, u8 mode);
@@ -103,13 +110,16 @@ static u8 g_ring_times = 0;
 static u8 g_lamp_times = 0;
 
 u8 g_hbeat_gap = 6;// default 6s
-u8 g_gps_trace_gap = 20;// default 10s
+u8 g_gps_trace_gap = 0;// default 10s
 
 u8 g_longitude[32] = "";
 u8 g_latitude[32] = "";
 u8 g_imei_str[32] = "";
 
-void sim7500e_mobit_process(u8* hbeaterrcnt, u8 index);
+u8 g_dw_write_enable = 0;
+vu16 g_data_pos = 0;
+vu16 g_data_size = 0;
+void sim7500e_mobit_process(u8 index);
 
 u8 sim7500e_get_cmd_count()
 {
@@ -193,10 +203,10 @@ u8 sim7500e_mp3_dw_check(void)
 
 	for (i=0; i<U3_RECV_LEN_ONE; i++) {
 		if ((':' == USART3_RX_BUF_BAK[i]) && (' ' == USART3_RX_BUF_BAK[i+1])) {
-//			szie_pos = i + 2;
+			size_pos = i + 2;
 		}
 
-		if (i >= size_pos) {
+		if ((i >= size_pos) && (size_pos != 0)) {
 			if ((0x0D == USART3_RX_BUF_BAK[i]) && (0x0A == USART3_RX_BUF_BAK[i+1])) {
 				data_pos = i + 2;
 				break;
@@ -205,21 +215,50 @@ u8 sim7500e_mp3_dw_check(void)
 			if ((i-size_pos) < 8) {
 				size_str[i-size_pos] = USART3_RX_BUF_BAK[i];
 			} else {
-				printf("DW size is too large!\n");
+				printf("DW size is too large = %s!\n", size_str);
 			}
 		}
 	}
 
 	size = atoi(size_str);
 
-	res = f_open(&f_txt,(const TCHAR*)g_mp3_update_name,FA_READ|FA_WRITE);
-	if (0 == res) {
-		f_lseek(&f_txt, f_txt.fsize);
-		f_write(&f_txt, USART3_RX_BUF_BAK+data_pos, size, (UINT*)&br);
-		f_close(&f_txt);
-	}
-
+	g_data_pos = data_pos;
+	g_data_size = size;
+//	g_dw_write_enable = 1;
+	
+//	while(1) {
+//		if (0 == g_dw_write_enable) {
+//			break;
+//		}
+//		delay_ms(10);
+//	}
+	
 	g_dw_recv_sum += size;
+	
+	return 0;
+}
+
+u8 sim7500e_iccid_check(void)
+{
+	u8 i = 0;
+	
+	memset(g_iccid_sim, 0, 32);
+	while(1) {
+		if ((USART3_RX_BUF_BAK[2+i] == '\r') && (USART3_RX_BUF_BAK[2+i+1] == '\n')) {
+				break;
+		} else {
+			g_iccid_sim[i] = USART3_RX_BUF_BAK[2+i];
+		}
+		i++;
+	}
+	
+	printf("ICCID = %s\n", g_iccid_sim);
+	
+	if (strlen((const char*)g_iccid_sim) >= 10) {
+		return 1;// OK
+	} else {
+		return 0;// NG
+	}
 }
 
 u8 sim7500e_imei_check(void)
@@ -241,6 +280,34 @@ u8 sim7500e_imei_check(void)
 	printf("IMEI = %s\n", g_imei_str);
 	
 	if (strlen((const char*)g_imei_str) >= 10) {
+		return 1;// OK
+	} else {
+		return 0;// NG
+	}
+}
+
+// +CSQ: 29,99
+u8 sim7500e_rssi_check(void)
+{
+	u8 i = 0;
+	
+	memset(g_rssi_sim, 0, 32);
+	while(1) {
+		if (USART3_RX_BUF_BAK[8+i] == ',') {
+				break;
+		} else {
+			if ((USART3_RX_BUF_BAK[8+i]>='0') && (USART3_RX_BUF_BAK[8+i]<='9')) {
+				g_rssi_sim[i] = USART3_RX_BUF_BAK[8+i];
+			} else {
+				break;
+			}
+		}
+		i++;
+	}
+	
+	printf("RSSI = %s\n", g_rssi_sim);
+	
+	if (strlen((const char*)g_rssi_sim) >= 10) {
 		return 1;// OK
 	} else {
 		return 0;// NG
@@ -273,39 +340,62 @@ u8 sim7500e_gps_check(void)
 
 u8* sim7500e_check_cmd(u8 *str, u8 index)
 {
+	u8 i = 0;
 	char *strx = 0;
 
-	printf("SIM7000E-01 Recv Data %s\n", USART3_RX_BUF+U3_RECV_LEN_ONE*index);
+#if 0
+	printf("ACK+++");
+	
+	for (i=0; i<10; i++) {
+		if (0 == USART3_RX_BUF[U3_RECV_LEN_ONE*index+i]) {
+			break;
+		}
+		printf("%c", USART3_RX_BUF[U3_RECV_LEN_ONE*index+i]);
+	}
+	printf("---ACK\n");
+#endif
+	// printf("SIM7000E-01 Recv Data %s\n", USART3_RX_BUF+U3_RECV_LEN_ONE*index);
 	// write_logs("SIM7000E", (char*)(USART3_RX_BUF+U3_RECV_LEN_ONE*index), USART3_RX_STA[index]&0X7FFF, 0);
 
 	// CONNECT's actual result ACK maybe recved 150sec later after "OK"
 	// very very long time wait, so must wait till recved CONNECT or ERROR
+	
 	if (0 == strcmp((const char*)str, "CONNECT")) {
 		strx = sim7500e_connect_check(index);
-	} else if (0 == strcmp((const char*)str, PROTOCOL_HEAD)) {// Unexcept Recved, But very emergency, Just Process it now
-		u8 temp = 0;
-		sim7500e_mobit_process(&temp, index);
-		// Unexcept Recved must return NULL
-		// strx = NULL
-	} else if (0 == strcmp((const char*)str, "AT+HTTPREAD")) {// Unexcept Recved
-		// Unexcept Recved must return NULL
-		// strx = NULL
 	} else {
 		strx = strstr((const char*)(USART3_RX_BUF+U3_RECV_LEN_ONE*index), (const char*)str);
 	}
-
-	// Already get "OK", next to get extra info(IMEI / GPS)
-	// Go on receiving other packages ASAP
-	memcpy(USART3_RX_BUF_BAK, USART3_RX_BUF+U3_RECV_LEN_ONE*index, U3_RECV_LEN_ONE);
-	USART3_RX_STA[index] = 0;
+	
+	if (0 == strcmp((const char*)str, "SEND OK")) {
+		g_hbeaterrcnt = 0;
+	}
+	
+	// if use strcmp, when SEND OK + ^Mobit will lose one MSG
+	if (0 == strstr((const char*)str, PROTOCOL_HEAD)) {// Do not process ^Mobit MSGs
+		// Already get "OK", next to get extra info(IMEI / GPS)
+		// Go on receiving other packages ASAP
+		memcpy(USART3_RX_BUF_BAK, USART3_RX_BUF+U3_RECV_LEN_ONE*index, U3_RECV_LEN_ONE);
+		USART3_RX_STA[index] = 0;
+	}
 	
 	return (u8*)strx;
 }
 
 u8 sim7500e_send_cmd(u8 *cmd, u8 *ack, u16 waittime)
 {
+	u8 i = 0;
+	u8 ret = 0;
 	u8 res = 0;
 
+	// Clear Buffer
+	for (i=0; i<U3_RECV_BUF_CNT; i++) {
+		if (USART3_RX_STA[i]&0X8000) {
+			if (!strstr((const char*)(USART3_RX_BUF+U3_RECV_LEN_ONE*i), "^MOBIT")) {
+				USART3_RX_STA[i] = 0;
+			}
+		}
+	}
+	
 	if (0 == strcmp((const char*)cmd, "AT+CIPSTART")) {
 		sim7500dev.tcp_status=0;// IDLE
 	}
@@ -320,16 +410,15 @@ u8 sim7500e_send_cmd(u8 *cmd, u8 *ack, u16 waittime)
 	} else {
 		u3_printf("%s\r\n", cmd);
 	}
-
 	if (ack&&waittime) {
-		u8 i = 0;
 		while (--waittime) {
 			delay_ms(10);
-
+			// printf("test100\n");
 			for (i=0; i<U3_RECV_BUF_CNT; i++) {
 				if (USART3_RX_STA[i]&0X8000) {
 					if (sim7500e_check_cmd(ack, i)) {
 						res = 0;
+						ret = 1;
 						break;
 					} else {
 						res = 1;
@@ -337,29 +426,33 @@ u8 sim7500e_send_cmd(u8 *cmd, u8 *ack, u16 waittime)
 				}
 			}
 
-			if (0 == res) {
+			if (1 == ret) {
 				break;
 			}
 
 			delay_ms(40);
 		}
-
 		if (waittime == 0) {
 			res = 2;
 		}
 	}
 
+//	printf("Leave SEND\n");
 	return res;
 }
 
 void sim7500e_tcp_send(char* send)
 {
+//	printf("tcp_send Enter\n");
+	
 	if(sim7500e_send_cmd("AT+CIPSEND",">",40)==0)//发送数据
 	{
 		sim7500e_send_cmd((u8*)send,0,500);	//发送数据:0X00  
 		delay_ms(20);						//必须加延时
-		sim7500e_send_cmd((u8*)0X1A,0,0);	//CTRL+Z,结束数据发送,启动一次传输	
-	}else sim7500e_send_cmd((u8*)0X1B,0,0);	//ESC,取消发送 	
+		sim7500e_send_cmd((u8*)0X1A,"SEND OK",500);	//CTRL+Z,结束数据发送,启动一次传输	
+	}else sim7500e_send_cmd((u8*)0X1B,"OK",500);	//ESC,取消发送 	
+	
+//	printf("tcp_send Exit\n");
 }
 
 // DEV ACK
@@ -468,6 +561,9 @@ void sim7500e_do_query_gps_ack(char* send)
 {
 	memset(send, 0, LEN_MAX_SEND);
 
+	sim7500e_send_cmd("AT+CGNSINF","OK",40);
+	sim7500e_gps_check();
+	
 	if (strlen((const char*)g_longitude) > 5) {
 		sprintf(send, "%s,%s,%s,%s,%s,%s,%s,0$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_DEV_ACK, CMD_QUERY_GPS, g_longitude, g_latitude);
 	} else {
@@ -578,8 +674,6 @@ void sim7500e_do_heart_beat_auto(char* send)
 
 	sprintf((char*)dev_time,"20%02d%02d%02d%02d%02d%02d",RTC_DateStruct.RTC_Year,RTC_DateStruct.RTC_Month,RTC_DateStruct.RTC_Date,RTC_TimeStruct.RTC_Hours,RTC_TimeStruct.RTC_Minutes,RTC_TimeStruct.RTC_Seconds);
 		
-	// TBD: Get rssi
-
 	memset(send, 0, LEN_MAX_SEND);
 	sprintf(send, "%s,%s,%s,%s,%s,%d,%s,%d$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_HEART_BEAT, dev_time, (g_drlock_sta_chged&0x7F), rssi_str, g_bms_battery_vol);
 	
@@ -734,9 +828,9 @@ void sim7500e_parse_msg(char* msg, char* send)
 						printf("g_gps_trace_gap = %d\n", g_gps_trace_gap);
 						sim7500e_do_stop_trace_ack(send);
 					}
-				} else {
+				} else {// Maybe Re
 					// TBD: Exception Process
-					break;
+					// break;
 				}
 			}
 		}
@@ -797,7 +891,7 @@ u8 sim7500e_setup_connect(void)
 	i = 0;
 	while (1) {
 		// sim7500e_send_cmd("AT+CIPSHUT","SHUT OK",200);
-		if (sim7500e_send_cmd("AT+CIPSTART=\"TCP\",\"47.105.245.93\",88", "CONNECT",600)) {// Max 600*50ms = 30s		
+		if (sim7500e_send_cmd("AT+CIPSTART=\"TCP\",\"47.105.112.41\",88", "CONNECT",600)) {// Max 600*50ms = 30s		
 			if(sim7500e_send_cmd("AT+CIPSHUT","SHUT OK",200)) {
 				delay_ms(1000);
 				sim7500e_send_cmd("AT+CIPSHUT","SHUT OK",200);
@@ -820,11 +914,11 @@ u8 sim7500e_setup_connect(void)
 
 	if (1 == sim7500dev.tcp_status) {// Connected OK
 		delay_ms(10);
-		if(sim7500e_send_cmd("AT+CIPSEND=5",">",40)) return 1;
-		delay_ms(10);
+//		if(sim7500e_send_cmd("AT+CIPSEND=5",">",40)) return 1;
+//		delay_ms(10);
 	
-		if(sim7500e_send_cmd("Hello","SEND OK",200)) return 1;
-		delay_ms(10);
+//		if(sim7500e_send_cmd("Hello","SEND OK",200)) return 1;
+//		delay_ms(10);
 
 		if(sim7500e_do_dev_register_auto(send_buf)) return 1;
 		delay_ms(10);
@@ -855,8 +949,14 @@ u8 sim7500e_setup_initial(void)
 	}
 	sim7500e_imei_check();
 
-	// TBD: Get ICCID
-	// TBD: Get MAC of SIM7000E or BT
+	// Get ICCID
+	if(sim7500e_send_cmd("AT+CCID","OK",40)) {
+		if(sim7500e_send_cmd("AT+CCID","OK",40)) return 1;
+	}
+	sim7500e_iccid_check();
+	
+	// TBD: Get MAC of BT
+	// (SIM7000E no mac)
 	
 	// Open GPS
 	if(sim7500e_send_cmd("AT+CGNSPWR=1","OK",40)) {
@@ -879,18 +979,58 @@ u8 sim7500e_setup_initial(void)
 		if(sim7500e_send_cmd("AT+CIICR","OK",200)) return 1;
 	}
 	
-	sim7500e_send_cmd("AT+CIFSR",0,40);
-	delay_ms(200);
-	
+	if (sim7500e_send_cmd("AT+CIFSR",0,200)) {
+		return 1;
+	}
+		
 	// Temp Test
-	// TBD: Need to be delete
-	CAN1_JumpLamp(g_lamp_times);
+	// CAN1_JumpLamp(g_lamp_times);
 
 	return sim7500e_setup_connect();
 }
 
+u8 sim7500e_setup_http(void)
+{
+	sim7500e_send_cmd("AT+HTTPTERM","XXX",100);
+	delay_ms(1000);
+	sim7500e_send_cmd("AT+SAPBR=0,1","XXX",100);
+	delay_ms(1000);
+	
+	if (sim7500e_send_cmd("AT+SAPBR=3,1,\"APN\",\"CMNET\"","OK",500)) {
+		if (sim7500e_send_cmd("AT+SAPBR=3,1,\"APN\",\"CMNET\"","OK",500)) return 1;
+	}
+	
+	if (sim7500e_send_cmd("AT+SAPBR=1,1","OK",500)) {
+		if (sim7500e_send_cmd("AT+SAPBR=1,1","OK",500)) return 1;
+	}
+	
+	if (sim7500e_send_cmd("AT+SAPBR=2,1","OK",500)) {
+		if (sim7500e_send_cmd("AT+SAPBR=2,1","OK",500)) return 1;
+	}
+	
+	if (sim7500e_send_cmd("AT+HTTPINIT","OK",500)) {
+		if (sim7500e_send_cmd("AT+HTTPINIT","OK",500)) return 1;
+	}
+	
+	if (sim7500e_send_cmd("AT+HTTPPARA=\"CID\",1","OK",500)) {
+		if (sim7500e_send_cmd("AT+HTTPPARA=\"CID\",1","OK",500)) return 1;
+	}
+	
+	if (sim7500e_send_cmd("AT+HTTPPARA=\"URL\",\"http://gdlt.sc.chinaz.com/Files/DownLoad/sound1/201701/8224.wav\"","OK",500)) {
+		if (sim7500e_send_cmd("AT+HTTPPARA=\"URL\",\"http://gdlt.sc.chinaz.com/Files/DownLoad/sound1/201701/8224.wav\"","OK",500)) return 1;
+	}
+	
+	if (sim7500e_send_cmd("AT+HTTPACTION=0","+HTTPACTION: 0,200",500)) {
+		if (sim7500e_send_cmd("AT+HTTPACTION=0","+HTTPACTION: 0,200",500)) return 1;
+	}
+	g_dw_size_total = atoi(USART3_RX_BUF_BAK+21);
+	
+	return 0;
+}
+
 void sim7500e_idle_actions(u16 gps_cnt)
 {
+#if 1
 	if (g_calypso_active) {
 		sim7500e_do_calypso_report(send_buf);
 		g_calypso_active = 0;
@@ -912,6 +1052,7 @@ void sim7500e_idle_actions(u16 gps_cnt)
 		g_bms_charge_sta_chged &= 0x7F;
 	}
 	if (g_invaid_move) {
+		g_invaid_move = 0;
 		sim7500e_do_invalid_moving_report(send_buf);
 	}
 	if (g_gps_trace_gap) {
@@ -920,32 +1061,38 @@ void sim7500e_idle_actions(u16 gps_cnt)
 			sim7500e_do_gps_location_report(send_buf);
 		}
 	}
+#endif
 	if (1 == g_mp3_update) {
 		u8 res = 0;
 		FIL f_txt;
 		u16 split_size = 0;
 
+		if (sim7500e_setup_http()) {
+			return;
+		}
+#if 1		
 		res = f_open(&f_txt,(const TCHAR*)g_mp3_update_name,FA_READ|FA_WRITE|FA_CREATE_ALWAYS);
 		if (0 == res) {
 			f_close(&f_txt);
 		}
-
-		sim7500e_send_cmd("AT+HTTPACTION=0","+HTTPACTION: 0,200",500);
-		// g_dw_size_total = atoi(USART3_RX_BUF_BAK+18);
+#endif
 
 		// do http get
 		while (1) {
 			if ((split_size+g_dw_recv_sum) > g_dw_size_total) {
 				split_size = g_dw_size_total - g_dw_recv_sum;
 			} else {
-				split_size =  512;
+				split_size =  2048;
 			}
 
-			sprintf(send_buf, "AT+HTTPREAD=%d,%d", g_dw_recv_sum, g_dw_recv_sum+split_size);
+			sprintf(send_buf, "AT+HTTPREAD=%d,%d", g_dw_recv_sum, split_size);
 			if (0 == sim7500e_send_cmd(send_buf,"+HTTPREAD",500)) {
-				sim7500e_mp3_dw_check();
+				if (sim7500e_mp3_dw_check()) {
+					break;
+				}
 			}
 
+			printf("g_dw_recv_sum = %d\n", g_dw_recv_sum);
 			if (g_dw_recv_sum == g_dw_size_total) {
 				g_mp3_update = 3;
 				break;
@@ -957,41 +1104,38 @@ void sim7500e_idle_actions(u16 gps_cnt)
 	}
 }
 
-void sim7500e_mobit_process(u8* hbeaterrcnt, u8 index)
+void sim7500e_mobit_process(u8 index)
 {
 	u8 *pTemp = NULL;
 	u8 data_lenth = 0;
 
-	printf("SIM7000E-03 Recv Data %s\n", USART3_RX_BUF+U3_RECV_LEN_ONE*index);
+	// printf("SIM7000E-03 Recv Data %s\n", USART3_RX_BUF+U3_RECV_LEN_ONE*index);
 	// write_logs("SIM7000E", (char*)(USART3_RX_BUF+U3_RECV_LEN_ONE*index), USART3_RX_STA[index]&0X7FFF, 0);
 			
-	if (*hbeaterrcnt) {
-		if (strstr((const char*)(USART3_RX_BUF+U3_RECV_LEN_ONE*index), "SEND OK")) {
-			*hbeaterrcnt = 0;
-		}
-	}
+	//if (g_hbeaterrcnt) {
+	//	if (strstr((const char*)(USART3_RX_BUF+U3_RECV_LEN_ONE*index), "SEND OK")) {
+	//		g_hbeaterrcnt = 0;
+	//	}
+	//}
 			
 	// Received User Data
 	pTemp = (u8*)strstr((const char*)(USART3_RX_BUF+U3_RECV_LEN_ONE*index), PROTOCOL_HEAD);
 	if (pTemp) {
 		data_lenth = strlen((const char*)pTemp);
 				
-		memset(USART3_RX_BUF_BAK, 0, U3_RECV_LEN_ONE);
-		// TBD: maybe copy some next package's data
-		memcpy(USART3_RX_BUF_BAK, pTemp, U3_RECV_LEN_ONE);
+		memset(USART3_RX_BUF_BAK_MOBIT, 0, U3_RECV_LEN_ONE);
+		memcpy(USART3_RX_BUF_BAK_MOBIT, pTemp, data_lenth);
 				
 		if (data_lenth < LEN_MAX_RECV) {
-			USART3_RX_BUF_BAK[data_lenth] = '\0';// $ -> 0
+			USART3_RX_BUF[U3_RECV_LEN_ONE*index+data_lenth] = '\0';// $ -> 0
 		}
+		
+		printf("RECVED MSG(%dB): %s\n", data_lenth, USART3_RX_BUF_BAK_MOBIT);
 				
-		USART3_RX_STA[index] = 0;// Go on receiving other packages ASAP
-				
-		printf("RECVED MSG(%dB): %s\n", data_lenth, USART3_RX_BUF_BAK);
-				
-		sim7500e_parse_msg(USART3_RX_BUF_BAK, send_buf);
-	} else {
-		USART3_RX_STA[index] = 0;
+		sim7500e_parse_msg(USART3_RX_BUF_BAK_MOBIT, send_buf);
 	}
+	
+	USART3_RX_STA[index] = 0;// Go on receiving other packages ASAP
 }
 
 // TBD Add Watch dog in sim7000e loop
@@ -1001,7 +1145,6 @@ void sim7500e_communication_loop(u8 mode,u8* ipaddr,u8* port)
 	u8 i = 0;
 	u8 oldsta = 0XFF;
 	u8 connectsta = 0;			//0,正在连接;1,连接成功;2,连接关闭; 
-	u8 hbeaterrcnt = 0;			//心跳错误计数器,连续5次心跳信号无应答,则重新连接
 	u8 iap_success = 0;
 
 	u16 timex = 0;
@@ -1011,6 +1154,10 @@ void sim7500e_communication_loop(u8 mode,u8* ipaddr,u8* port)
 		return;
 	}
 
+	if (1 == sim7500dev.tcp_status) {// Connected OK
+		connectsta = 1;
+	}
+	
 	if (iap_success) {
 		sim7500e_do_iap_success_report(send_buf);
 	}
@@ -1021,20 +1168,25 @@ void sim7500e_communication_loop(u8 mode,u8* ipaddr,u8* port)
 			LED0 = !LED0;
 
 			// TCP connect failed, just re-connect
-			if (connectsta==2 || hbeaterrcnt>8) {
+			if (connectsta==2 || g_hbeaterrcnt>8) {
+				connectsta = 0;
+ 				g_hbeaterrcnt = 0;
+				sim7500dev.tcp_status = 2;
+				
 				if (sim7500e_setup_connect()) {
 					break;
 				}
-
-				connectsta = 0;
- 				hbeaterrcnt = 0;
+				
+				if (1 == sim7500dev.tcp_status) {// Connected OK
+					connectsta = 1;
+				}
 			}
 		}
 
 		// will not be run, because, if connectsta=0, will do re-connect
 		if ((connectsta==0) && (timex%200)==0) {
-			sim7500e_send_cmd("AT+CIPSTATUS","OK",500);
-			sim7500e_ipsta_check(&connectsta);
+			//sim7500e_send_cmd("AT+CIPSTATUS","OK",500);
+			//sim7500e_ipsta_check(&connectsta);
 		}
 
 		// If TCP package arrive here, then it will be 
@@ -1047,12 +1199,13 @@ void sim7500e_communication_loop(u8 mode,u8* ipaddr,u8* port)
 				if(0 == gps_cnt%(g_gps_trace_gap*100)) {
 					gps_cnt = 0;
 				}
-				
+#if 0				
 				if (1000 == gps_cnt) {
 					if (0 == g_mp3_update) {
 						g_mp3_update = 1;
 					}
 				}
+#endif
 			} else {
 				gps_cnt = 0;
 			}
@@ -1062,23 +1215,44 @@ void sim7500e_communication_loop(u8 mode,u8* ipaddr,u8* port)
 			// every loop delay 10ms
 			if (timex >= (g_hbeat_gap*100)) {
 				timex = 0;
-			
-				sim7500e_do_heart_beat_auto(send_buf);
+#if 1
+				// Get RSSI
+				if(sim7500e_send_cmd("AT+CSQ","OK",100)) {
+					sim7500e_send_cmd("AT+CSQ","OK",100);
+				}
 				
-				hbeaterrcnt++;
-				printf("hbeaterrcnt = %d\r\n",hbeaterrcnt);
+				sim7500e_rssi_check();
+	
+				sim7500e_do_heart_beat_auto(send_buf);
+#endif
+				g_hbeaterrcnt++;
+				printf("hbeaterrcnt = %d\r\n",g_hbeaterrcnt);
 			}
 			
 			gps_cnt++;
 		}
 
 		delay_ms(10);
-
-		for (i=0; i<U3_RECV_BUF_CNT; i++) {
-			if (USART3_RX_STA[i]&0X8000) {
-				sim7500e_mobit_process(&hbeaterrcnt, i);
-			}
+		
+		if (g_need_ack1&0x8000) {
+			// call tcp_send ack
+			g_need_ack1 &= 0x7FFF;
+		} else if (g_need_ack1&0x4000) {
+			// call tcp_send ack
+			g_need_ack1 &= 0xBFFF;
+		} else if (g_need_ack1&0x2000) {
+			// call tcp_send ack
+			g_need_ack1 &= 0xDFFF;
+		} else if (g_need_ack1&0x1000) {
+			// call tcp_send ack
+			g_need_ack1 &= 0xEFFF;
 		}
+
+//		for (i=0; i<U3_RECV_BUF_CNT; i++) {
+//			if (USART3_RX_STA[i]&0X8000) {
+//				//sim7500e_mobit_process(i);
+//			}
+//		}
 
 		if (oldsta != connectsta) {
 			oldsta = connectsta;

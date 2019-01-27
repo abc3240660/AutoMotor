@@ -132,15 +132,15 @@ void RTC_Sync_time(u8* sync_time)
 
 	// 20190111141156
 	if (14 == strlen(sync_time)) {
-		u8 year  = sync_time[2]  * 10 + sync_time[3];
-		u8 month = sync_time[4]  * 10 + sync_time[5];
-		u8 day   = sync_time[6]  * 10 + sync_time[7];
-		u8 hour  = sync_time[8]  * 10 + sync_time[9];
-		u8 min   = sync_time[10] * 10 + sync_time[11];
-		u8 sec   = sync_time[12] * 10 + sync_time[13];
+		u8 year  = (sync_time[2]-'0')  * 10 + sync_time[3]-'0';
+		u8 month = (sync_time[4]-'0')  * 10 + sync_time[5]-'0';
+		u8 day   = (sync_time[6]-'0')  * 10 + sync_time[7]-'0';
+		u8 hour  = (sync_time[8]-'0')  * 10 + sync_time[9]-'0';
+		u8 min   = (sync_time[10]-'0') * 10 + sync_time[11]-'0';
+		u8 sec   = (sync_time[12]-'0') * 10 + sync_time[13]-'0';
 
-		RTC_Set_Time(year,month,day,RTC_H12_AM);
-		RTC_Set_Date(hour,min,sec,1);
+		RTC_Set_Time(hour,min,sec,RTC_H12_AM);
+		RTC_Set_Date(year,month,day,1);
 	}
 }
 

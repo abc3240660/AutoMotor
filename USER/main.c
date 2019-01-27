@@ -75,16 +75,26 @@ void write_logs(char *module, char *log, u16 size, u8 mode);
 
 u8 g_mp3_play = 0;
 u8 g_mp3_play_name[32] = "";
+extern u8 g_mp3_update_name[128];
+extern u8 g_mp3_update;
+extern u8 g_dw_write_enable;
+extern vu16 g_data_pos;
+extern vu16 g_data_size;
+extern u8 USART3_RX_BUF_BAK[U3_RECV_LEN_ONE];
 //////////////////////////////////////////////////////////////////////////////	 
 
 //系统初始化
 void system_init(void)
 {
+	u8 res;
+	u16 temp=0;
+	u32 dtsize,dfsize;
+	
 	u8 CAN1_mode=0; //CAN工作模式;0,普通模式;1,环回模式
 	u8 CAN2_mode=0; //CAN工作模式;0,普通模式;1,环回模式	
+	
 	delay_init(168);			//延时初始化  
 	uart_init(115200);		//初始化串口波特率为115200
-	#if 1
 	usart3_init(115200);		//初始化串口3波特率为115200
 	usart5_init(115200);
 	usart6_init(9600);	    //串口初始化波特率为9600
@@ -116,13 +126,13 @@ void system_init(void)
 	TIM4_Init(9999,8399);
 	
 	//VS_Init();	  				//初始化VS1053
-	#endif
+  
 	MPU_Init();					//初始化MPU6050
 	delay_ms(200);
 	while(mpu_dmp_init())
 	{
  		delay_ms(200);
-		usart1_send_char('K');
+		//usart1_send_char('K');
 	}
 	//mpu_dmp_init();
 #if 0	
@@ -195,15 +205,55 @@ void start_task(void *pdata)
 	sem_beep=OSSemCreate(1);
 	OSStatInit();		//初始化统计任务.这里会延时1秒钟左右	
 // 	app_srand(OSTime);
-
+	
 	OS_ENTER_CRITICAL();//进入临界区(无法被中断打断)    
  	OSTaskCreate(main_task,(void *)0,(OS_STK*)&MAIN_TASK_STK[MAIN_STK_SIZE-1],MAIN_TASK_PRIO);						   
  	OSTaskCreate(usart_task,(void *)0,(OS_STK*)&USART_TASK_STK[USART_STK_SIZE-1],USART_TASK_PRIO);						   
-	//OSTaskCreate(higher_task,(void *)0,(OS_STK*)&HIGHER_TASK_STK[HIGHER_STK_SIZE-1],HIGHER_TASK_PRIO); 					   
-	OSTaskCreate(lower_task,(void *)0,(OS_STK*)&LOWER_TASK_STK[LOWER_STK_SIZE-1],LOWER_TASK_PRIO); 					   
+	OSTaskCreate(higher_task,(void *)0,(OS_STK*)&HIGHER_TASK_STK[HIGHER_STK_SIZE-1],HIGHER_TASK_PRIO); 					   
+	// OSTaskCreate(lower_task,(void *)0,(OS_STK*)&LOWER_TASK_STK[LOWER_STK_SIZE-1],LOWER_TASK_PRIO); 					   
 	OSTaskSuspend(START_TASK_PRIO);	//挂起起始任务.
 	OS_EXIT_CRITICAL();	//退出临界区(可以被中断打断)
 } 
+
+// Play MP3 task
+void lower_task(void *pdata)
+{
+	while(1) {
+		if (g_mp3_play) {
+			music_play((const char*)g_mp3_play_name);
+
+			g_mp3_play = 0;
+			memset(g_mp3_play_name, 0, 32);
+		}
+
+		printf("test lower task\n");
+   	OSTimeDlyHMSM(0,0,0,500);// 500ms
+	}
+}
+
+void sim7500e_mobit_process(u8 index);
+
+// MPU6050 Check and BT Data Parse
+void main_task(void *pdata)
+{
+	u8 i = 0;
+	
+	blue_init();
+	while(1) {
+		// TBD: Add MPU6050 Check
+		// TBD: Add Invalid Moving Check
+		// TBD: Add BT Data Parse
+		for (i=0; i<U3_RECV_BUF_CNT; i++) {
+			if (USART3_RX_STA[i]&0X8000) {
+				if (strstr((const char*)(USART3_RX_BUF+U3_RECV_LEN_ONE*i), PROTOCOL_HEAD)) {
+					sim7500e_mobit_process(i);
+				}
+			}
+		}
+		
+   	OSTimeDlyHMSM(0,0,0,100);// 500ms
+	}
+}
 
 void create_logfile(void)
 {
@@ -256,7 +306,7 @@ void write_logs(char *module, char *log, u16 size, u8 mode)
 		printf("%s", g_logmsg);
 		
 		OSSemPend(sem_beep,0,&err);
-		res = f_open(&f_txt,(const TCHAR*)g_logname,FA_READ|FA_WRITE);
+		res= f_open(&f_txt,(const TCHAR*)g_logname,FA_READ|FA_WRITE);
 		if(res==0)
 		{			
 			f_lseek(&f_txt, f_txt.fsize);
@@ -281,7 +331,7 @@ void usart1_niming_report(u8 fun,u8*data,u8 len)
 	send_buf[2]=len;	//数据长度
 	for(i=0;i<len;i++)send_buf[3+i]=data[i];			//复制数据
 	for(i=0;i<len+3;i++)send_buf[len+3]+=send_buf[i];	//计算校验和	
-	for(i=0;i<len+4;i++)usart1_send_char(send_buf[i]);	//发送数据到串口1 
+	// for(i=0;i<len+4;i++)usart1_send_char(send_buf[i]);	//发送数据到串口1 
 }
 //通过串口1上报结算后的姿态数据给电脑
 //aacx,aacy,aacz:x,y,z三个方向上面的加速度值
@@ -324,7 +374,7 @@ void MPU6050_Risk_Check()
 	short temp;					//温度
 
 	ret = mpu_dmp_get_data(&pitch,&roll,&yaw);
-	usart1_send_char(ret);
+	//usart1_send_char(ret);
 
 	if (ret == 0) {
 		temp=MPU_Get_Temperature();	//得到温度值
@@ -343,36 +393,6 @@ void MPU6050_Risk_Check()
 	}
 }
 
-// Play MP3 task
-void lower_task(void *pdata)
-{
-	while(1) {
-		if (g_mp3_play) {
-			music_play((const char*)g_mp3_play_name);
-
-			g_mp3_play = 0;
-			memset(g_mp3_play_name, 0, 32);
-		}
-		
-    	OSTimeDlyHMSM(0,0,0,500);// 500ms
-	}
-}
-
-// MPU6050 Check and BT Data Parse
-void main_task(void *pdata)
-{
-	printf("lower_task\r\n");
-	blue_init();
-	while(1) {
-		// TBD: Add MPU6050 Check
-		//MPU6050_Risk_Check();
-
-		// TBD: Add Invalid Moving Check
-		// TBD: Add BT Data Parse
-    	OSTimeDlyHMSM(0,0,0,500);// 500ms
-	}
-}
-
 //执行最不需要时效性的代码
 void usart_task(void *pdata)
 {
@@ -388,6 +408,23 @@ void usart_task(void *pdata)
             loop_cnt = 0;
             printf("Hall Counter = %d\n", pluse_num_new);
 		}
+
+#if 1
+		if (1 == g_dw_write_enable) {
+			u32 br = 0;
+			u8 res = 0;
+			FIL f_txt;
+			
+			res = f_open(&f_txt,(const TCHAR*)g_mp3_update_name,FA_READ|FA_WRITE);
+			if (0 == res) {
+				f_lseek(&f_txt, f_txt.fsize);
+				f_write(&f_txt, USART3_RX_BUF_BAK+g_data_pos, g_data_size, (UINT*)&br);
+				f_close(&f_txt);
+			}
+			
+			g_dw_write_enable = 0;
+		}
+#endif
 
 		OSTimeDlyHMSM(0,0,0,500);// 500ms
 		OSTimeDlyHMSM(0,0,0,500);// 500ms

@@ -5,12 +5,12 @@
 #include "string.h"
 #include "timer.h"
 #include "ucos_ii.h"
+#include "malloc.h"
 
 __align(8) u8 USART3_TX_BUF[USART3_MAX_SEND_LEN];
 
-// TBD: 2048B is too large for static array
-u8 USART3_RX_BUF[USART3_MAX_RECV_LEN];
-
+//u8 USART3_RX_BUF[USART3_MAX_RECV_LEN];
+u8* USART3_RX_BUF = NULL;
 u8 U3_RX_ID = 0;// 0~3
 vu16 USART3_RX_STA[4] = {0};
 
@@ -22,10 +22,13 @@ vu16 USART3_RX_STA[4] = {0};
 void USART3_Get_Free_Buf(void)
 {
 	u8 i = 0;
-
+	//U3_RX_ID = 0;
 	for (i=0; i<U3_RECV_BUF_CNT; i++) {
 		if ((USART3_RX_STA[i]&(1<<15)) == 0) {// first free Buf
 			U3_RX_ID = i;
+			memset(USART3_RX_BUF+U3_RECV_LEN_ONE*i, 0, U3_RECV_LEN_ONE);
+			//printf("switch to buf id = %d\n", i);
+			break;
 		}
 	}
 }
@@ -96,9 +99,11 @@ void usart3_init(u32 bound)
 	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;			//IRQ通道使能
 	NVIC_Init(&NVIC_InitStructure);	//根据指定的参数初始化VIC寄存器
 	
-	TIM7_Int_Init(100-1,8400-1);	//10ms中断一次
+	TIM7_Int_Init(1000-1,8400-1);	//10ms中断一次
 	
   TIM_Cmd(TIM7, DISABLE); //关闭定时器7
+	
+	USART3_RX_BUF = mymalloc(SRAMIN, USART3_MAX_RECV_LEN);
 	
 	USART3_RX_STA[0] = 0;
 	USART3_RX_STA[1] = 0;
