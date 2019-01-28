@@ -388,6 +388,7 @@ extern void USART3_Get_Free_Buf(void);
 void TIM7_IRQHandler(void)
 { 	
 	u8 i = 0;
+	u8 is_dw_dat = 0
 	
 	OSIntEnter();    		    
 	if(TIM_GetITStatus(TIM7,TIM_IT_Update)==SET)
@@ -397,8 +398,12 @@ void TIM7_IRQHandler(void)
 			USART3_RX_BUF[U3_RECV_LEN_ONE*U3_RX_ID + USART3_RX_STA[U3_RX_ID]&0X7FFF] = 0;
 			
 #if 1
+			if (strstr((const char*)(USART3_RX_BUF+U3_RECV_LEN_ONE*U3_RX_ID), (const char*)"+HTTPREAD")) {
+				is_dw_dat = 1;
+			}
+
 			printf("+++SIM7K RECVED(%dB):", USART3_RX_STA[U3_RX_ID]&0X7FFF);
-			
+				
 			for (i=0; i<64; i++) {
 				if (0 == USART3_RX_BUF[U3_RECV_LEN_ONE*U3_RX_ID+i]) {
 					break;

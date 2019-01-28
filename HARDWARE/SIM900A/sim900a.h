@@ -2,37 +2,12 @@
 #define __SIM7500E_H__	 
 #include "sys.h"
 
-#define SIM7500E_MAX_NEWMSG	10		//最大10条新消息
-
 typedef struct 
 {							  
 	u8 tcp_status;// 0-idle, 1-Connect OK, 2-Connect Failed/Error
- 	u8 status;		//SIM7500EA状态
-					//bit7:0,没有找到模块;1,找到模块了
-					//bit6:0,SIM卡不正常;1,SIM卡正常
-					//bit5:0,未获得运营商名字;1,已获得运营商名字
-					//bit4:0,中国移动;1,中国联通
-					//bit3:0,TCP Connect NG;1,TCP Connect OK
-					//[2:0]:保留
-	
-	u8 mode;		//当前工作模式
-					//0,号码输入模式/短信模式
-					//1,拨号中
-					//2,通话中
-					//3,来电响应中
-	
-	vu8 cmdon;		//标记是否有指令在发送等待状态
-					//0,没有指令在等待回应
-					//1,有指令在等待回应
-	
-	u8 csq;			//信号质量
-	
-	vu8 newmsg;		//新消息条数,0,没有新消息;其他,新消息条数
-	u8 newmsgindex[SIM7500E_MAX_NEWMSG];//新短信在SIM卡内的索引,最长记录SIM7500E_MAX_NEWMSG条新短信
-	u8 incallnum[20];//来电号码缓存区,最长20位
 }__sim7500dev; 
 
-extern __sim7500dev sim7500dev;	//sim900控制器
+extern __sim7500dev sim7500dev;
 
 
 #define PROTOCOL_HEAD	"^MOBIT"
@@ -69,6 +44,8 @@ extern __sim7500dev sim7500dev;	//sim900控制器
 #define CMD_STOP_TRACE   	"T2"// DEV ACK
 #define CMD_QUERY_BMS   	"B0"// DEV ACK
 #define CMD_QUERY_MP3   	"P2"// DEV ACK
+#define CMD_QUERY_CAR   	"C4"// DEV ACK
+#define CMD_ENGINE_STOP   	"C6"// DEV ACK
 
 #define LEN_SYS_TIME    32
 #define LEN_IMEI_NO     32
@@ -78,6 +55,21 @@ extern __sim7500dev sim7500dev;	//sim900控制器
 #define LEN_MAX_RECV    32
 
 #define DEBUG_USE 1
+
+// BIT0~7: 0-OFF,1-ON
+#define BIT_HAND_BRAKE   (1 << 0) // ShouSha
+#define BIT_FAR_LED      (1 << 1) // YuanGuang
+#define BIT_NEAR_LED     (1 << 2) // JinGuang
+#define BIT_FOG_LED      (1 << 3) // WuDeng
+#define BIT_CLEAR_LED    (1 << 4) // ShiKuoDeng
+#define BIT_LEFT_DOOR    (1 << 5) // ZuoCheMen
+#define BIT_RIGHT_DOOR   (1 << 6) // YouCheMen
+#define BIT_CHARGE_STA   (1 << 7) // ChargeSta
+
+// BIT8~9: 0-N,1-P,2-D,3-R
+#define BIT_GEAR_STA     (1 << 8) // DangWei
+
+extern u16 g_car_sta;
 
 enum CMD_TYPE {
 	DEV_REGISTER = 0,
@@ -104,10 +96,12 @@ enum CMD_TYPE {
 	STOP_TRACE,
 	QUERY_BMS,
 	QUERY_MP3,
+	QUERY_CAR,
+	ENGINE_STOP,
 	UNKNOWN_CMD
 };
  
-#define swap16(x) (x&0XFF)<<8|(x&0XFF00)>>8		//高低字节交换宏定义
+#define swap16(x) (x&0XFF)<<8|(x&0XFF00)>>8	
 
 u8* sim7500e_check_cmd(u8 *str, u8 index);
 u8 sim7500e_send_cmd(u8 *cmd,u8 *ack,u16 waittime);
