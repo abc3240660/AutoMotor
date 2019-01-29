@@ -27,8 +27,9 @@ u8 g_iap_update = 0;
 u8 g_iap_update_name[128] = "";
 
 u8 g_mp3_update = 0;
-u8 g_mp3_update_name[128] = "0:/test.wav";
+u8 g_mp3_update_name[128] = "";
 u8 g_mp3_update_url[128] = "";
+u8 g_mp3_update_md5[64] = "";
 
 u32 g_dw_recved_sum = 0;
 u32 g_dw_size_total = 0;
@@ -374,7 +375,7 @@ u8* sim7500e_check_cmd(u8 *str, u8 index)
 	// very very long time wait, so must wait till recved CONNECT or ERROR
 	
 	// TBD: Check TCP Server Closed's AT-ACK
-	if (strstr((const char*)(USART3_RX_BUF+U3_RECV_LEN_ONE*index), "Closed")) {
+	if (strstr((const char*)(USART3_RX_BUF+U3_RECV_LEN_ONE*index), "CLOSED")) {
 		sim7500dev.tcp_status = 2;
 	}
 
@@ -394,7 +395,7 @@ u8* sim7500e_check_cmd(u8 *str, u8 index)
 	}
 	
 	// if use strcmp, when SEND OK + ^Mobit will lose one MSG
-	if (0 == strstr((const char*)str, PROTOCOL_HEAD)) {// Do not process ^Mobit MSGs
+	if (0 == strstr((const char*)(USART3_RX_BUF+U3_RECV_LEN_ONE*index), PROTOCOL_HEAD)) {// Do not process ^Mobit MSGs
 		// Already get "OK", next to get extra info(IMEI / GPS)
 		// Go on receiving other packages ASAP
 		memcpy(USART3_RX_BUF_BAK, USART3_RX_BUF+U3_RECV_LEN_ONE*index, U3_RECV_LEN_ONE);
@@ -413,9 +414,10 @@ void sim7500e_clear_recved_buf()
 		if (USART3_RX_STA[i]&0X8000) {
 			if (!strstr((const char*)(USART3_RX_BUF+U3_RECV_LEN_ONE*i), "^MOBIT")) {
 				// TBD: Check TCP Server Closed's AT-ACK
-				if (strstr((const char*)(USART3_RX_BUF+U3_RECV_LEN_ONE*i), "Closed")) {
+				if (strstr((const char*)(USART3_RX_BUF+U3_RECV_LEN_ONE*i), "CLOSED")) {
 					sim7500dev.tcp_status = 2;
 				}
+				
 				USART3_RX_STA[i] = 0;
 			}
 		}
@@ -897,12 +899,24 @@ void sim7500e_parse_msg(char* msg)
 				memset(g_mp3_play_name, 0, 32);
 				strcpy((char*)g_mp3_play_name, split_str);
 				printf("g_mp3_play_name = %s\n", g_mp3_play_name);
+				
+				// TBD: need to be placed in right positon
 				sim7500e_do_mp3_play_ack();
 			} else if (MP3_UPDATE == cmd_type) {
-				g_mp3_update = 1;
-				memset(g_mp3_update_url, 0, 128);
-				strcpy((char*)g_mp3_update_url, split_str);
-				printf("g_mp3_update_url = %s\n", g_mp3_update_url);
+				if (4 == index) {
+					memset(g_mp3_update_name, 0, 128);
+					strcpy((char*)g_mp3_update_name, split_str);
+					printf("g_mp3_update_name = %s\n", g_mp3_update_name);
+				} else if (5 == index) {
+					g_mp3_update = 1;
+					memset(g_mp3_update_url, 0, 128);
+					strcpy((char*)g_mp3_update_url, split_str);
+					printf("g_mp3_update_url = %s\n", g_mp3_update_url);
+				} else if (6 == index) {
+					memset(g_mp3_update_md5, 0, 64);
+					strcpy((char*)g_mp3_update_md5, split_str);
+					printf("g_mp3_update_md5 = %s\n", g_mp3_update_md5);
+				}
 			} else if (START_TRACE == cmd_type) {
 				g_gps_trace_gap = atoi(split_str);
 				printf("g_gps_trace_gap = %d\n", g_gps_trace_gap);
@@ -1035,6 +1049,8 @@ u8 sim7500e_setup_initial(void)
 	if (sim7500e_send_cmd("AT+CIFSR",0,200)) {
 		return 1;
 	}
+	
+	delay_ms(500);
 		
 	// Temp Test
 	// CAN1_JumpLamp(g_lamp_times);
@@ -1075,8 +1091,12 @@ u8 sim7500e_setup_http(void)
 		if (sim7500e_send_cmd("AT+HTTPPARA=\"CID\",1","OK",500)) return 1;
 	}
 	
-	if (sim7500e_send_cmd("AT+HTTPPARA=\"URL\",\"http://gdlt.sc.chinaz.com/Files/DownLoad/sound1/201701/8224.wav\"","OK",500)) {
-		if (sim7500e_send_cmd("AT+HTTPPARA=\"URL\",\"http://gdlt.sc.chinaz.com/Files/DownLoad/sound1/201701/8224.wav\"","OK",500)) return 1;
+	sprintf(send_buf, "AT+HTTPPARA=\"URL\",\"%s\"", g_mp3_update_url);
+	//if (sim7500e_send_cmd("AT+HTTPPARA=\"URL\",\"http://gdlt.sc.chinaz.com/Files/DownLoad/sound1/201701/8224.wav\"","OK",1000)) {
+	//	if (sim7500e_send_cmd("AT+HTTPPARA=\"URL\",\"http://gdlt.sc.chinaz.com/Files/DownLoad/sound1/201701/8224.wav\"","OK",1000)) return 1;
+	//}
+	if (sim7500e_send_cmd((u8*)send_buf,"OK",500)) {
+		if (sim7500e_send_cmd((u8*)send_buf,"OK",500)) return 1;
 	}
 	
 	if (sim7500e_send_cmd("AT+HTTPACTION=0","+HTTPACTION: 0,200",500)) {
@@ -1131,12 +1151,19 @@ void sim7500e_idle_actions(void)
 		if (1 == g_mp3_update) {
 			u8 res = 0;
 			FIL f_txt;
+			u8 mp3_file[32] = "";
 
 			if (sim7500e_setup_http()) {
 				return;
 			}
 
-			res = f_open(&f_txt,(const TCHAR*)g_mp3_update_name,FA_READ|FA_WRITE|FA_CREATE_ALWAYS);
+			// file name is too long
+			if (strlen((const char*)g_mp3_update_name) > 20) {
+				return;
+			}
+			
+			sprintf((char*)mp3_file, "0:/%s.wav", g_mp3_update_name);
+			res = f_open(&f_txt,(const TCHAR*)mp3_file,FA_READ|FA_WRITE|FA_CREATE_ALWAYS);
 			if (0 == res) {
 				f_close(&f_txt);
 			} else {
@@ -1335,6 +1362,10 @@ void sim7500e_communication_loop(u8 mode,u8* ipaddr,u8* port)
 
 		if (timex >= 60000) {
 			timex = 0;
+		}
+		
+		if (0 == timex%500) {
+			printf("main_loop test\n");
 		}
 
 		timex++;

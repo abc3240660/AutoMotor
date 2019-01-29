@@ -402,12 +402,19 @@ void TIM7_IRQHandler(void)
 				is_dw_dat = 1;
 			}
 
-			printf("+++SIM7K RECVED(%dB):", USART3_RX_STA[U3_RX_ID]&0X7FFF);
+			printf("+++SIM7K RECVED(Buf%d - %dB):", U3_RX_ID, USART3_RX_STA[U3_RX_ID]&0X7FFF);
 				
 			for (i=0; i<64; i++) {
 				if (0 == USART3_RX_BUF[U3_RECV_LEN_ONE*U3_RX_ID+i]) {
 					break;
 				}
+				
+				if (1 == is_dw_dat) {
+					if ((0x0D==USART3_RX_BUF[U3_RECV_LEN_ONE*U3_RX_ID+i]) && (USART3_RX_BUF[U3_RECV_LEN_ONE*U3_RX_ID+i+2]!='+')) {
+						break;
+					}
+				}
+				
 				printf("%c", USART3_RX_BUF[U3_RECV_LEN_ONE*U3_RX_ID+i]);
 			}
 			printf("---\n");

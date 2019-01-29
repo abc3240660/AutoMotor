@@ -147,7 +147,7 @@ void system_init(void)
 	//mpu_dmp_init();
 #endif
 
-#if 0	
+#if 1
 	delay_ms(1500);
 	
  	exfuns_init();// alloc for fats
@@ -436,9 +436,10 @@ void main_task(void *pdata)
 		// Update total_meters into flash
 		if (50 == loop_cnt) {
 			loop_cnt = 0;
+			printf("main_task test\n");
 			// sys_env_save();
 		}
-   		OSTimeDlyHMSM(0,0,0,100);// 500ms
+   	OSTimeDlyHMSM(0,0,0,100);// 500ms
 	}
 }
 
@@ -455,7 +456,7 @@ void usart_task(void *pdata)
 
 		if (loop_cnt++ == 3) {
 				loop_cnt = 0;
-        printf("Hall Counter = %d\n", pluse_num_new);
+        // printf("Hall Counter = %d\n", pluse_num_new);
 		}
 
 #if 1
@@ -463,8 +464,10 @@ void usart_task(void *pdata)
 			u32 br = 0;
 			u8 res = 0;
 			FIL f_txt;
+			u8 mp3_file[32] = "";
 			
-			res = f_open(&f_txt,(const TCHAR*)g_mp3_update_name,FA_READ|FA_WRITE);
+			sprintf((char*)mp3_file, "0:/%s.wav", g_mp3_update_name);
+			res = f_open(&f_txt,(const TCHAR*)mp3_file,FA_READ|FA_WRITE);
 			if (0 == res) {
 				f_lseek(&f_txt, f_txt.fsize);
 				f_write(&f_txt, USART3_RX_BUF_BAK+g_data_pos, g_data_size, (UINT*)&br);

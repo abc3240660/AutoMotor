@@ -4,7 +4,7 @@
 #include "stdio.h"	  
 
 #define U3_RECV_BUF_CNT		4
-#define U3_RECV_LEN_ONE		2050
+#define U3_RECV_LEN_ONE		2560
 #define U3_DATA_LEN_ONE		2048
 #define USART3_MAX_RECV_LEN		(U3_RECV_LEN_ONE * U3_RECV_BUF_CNT)
 #define USART3_MAX_SEND_LEN		400
