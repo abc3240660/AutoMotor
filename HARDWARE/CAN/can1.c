@@ -4,8 +4,8 @@
 
 extern u8 g_door_state;
 extern u8 g_power_state;
-extern u8 g_drlock_sta_chged;
 extern u32 g_trip_meters;
+extern u8 g_drlock_sta_chged;
 /****************************************************************************
 * 名    称: u8 CAN1_Mode_Init(u8 mode)
 * 功    能：CAN初始化

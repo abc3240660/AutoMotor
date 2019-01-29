@@ -21,7 +21,7 @@ extern __sim7500dev sim7500dev;
 #define CMD_DEV_REGISTER	"R0"// DEV Host
 #define CMD_HEART_BEAT		"H0"// DEV Host
 #define CMD_DOOR_LOCKED		"C1"// DEV Host
-#define CMD_DOOR_UNLOCKED		"O1"// DEV Host
+#define CMD_DOOR_UNLOCKED	"O1"// DEV Host
 #define CMD_CALYPSO_UPLOAD	"C3"// DEV Host
 #define CMD_INVALID_MOVE	"W1"// DEV Host
 #define CMD_REPORT_GPS		"L1"// DEV Host
