@@ -26,7 +26,7 @@ __align(8) static OS_STK START_TASK_STK[START_STK_SIZE];
 //任务函数
 void start_task(void *pdata);	
  			   
-#define LOWER_TASK_PRIO       			7
+#define LOWER_TASK_PRIO       			8
 #define LOWER_STK_SIZE  		    	128
 __align(8) static OS_STK LOWER_TASK_STK[LOWER_STK_SIZE];
 void lower_task(void *pdata);	
@@ -35,7 +35,7 @@ void lower_task(void *pdata);
 //设置任务优先级
 #define USART_TASK_PRIO       			7 
 //设置任务堆栈大小
-#define USART_STK_SIZE  		    	128
+#define USART_STK_SIZE  		    	512
 //任务堆栈，8字节对齐	
 __align(8) static OS_STK USART_TASK_STK[USART_STK_SIZE];
 //任务函数
@@ -217,7 +217,7 @@ void start_task(void *pdata)
  	OSTaskCreate(main_task,(void *)0,(OS_STK*)&MAIN_TASK_STK[MAIN_STK_SIZE-1],MAIN_TASK_PRIO);						   
  	OSTaskCreate(usart_task,(void *)0,(OS_STK*)&USART_TASK_STK[USART_STK_SIZE-1],USART_TASK_PRIO);						   
 	OSTaskCreate(higher_task,(void *)0,(OS_STK*)&HIGHER_TASK_STK[HIGHER_STK_SIZE-1],HIGHER_TASK_PRIO); 					   
-	// OSTaskCreate(lower_task,(void *)0,(OS_STK*)&LOWER_TASK_STK[LOWER_STK_SIZE-1],LOWER_TASK_PRIO); 					   
+	OSTaskCreate(lower_task,(void *)0,(OS_STK*)&LOWER_TASK_STK[LOWER_STK_SIZE-1],LOWER_TASK_PRIO); 					   
 	OSTaskSuspend(START_TASK_PRIO);	//挂起起始任务.
 	OS_EXIT_CRITICAL();	//退出临界区(可以被中断打断)
 } 
