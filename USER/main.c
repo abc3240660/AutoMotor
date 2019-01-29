@@ -86,6 +86,7 @@ extern u8 g_dw_write_enable;
 extern vu16 g_data_pos;
 extern vu16 g_data_size;
 extern u8 USART3_RX_BUF_BAK[U3_RECV_LEN_ONE];
+extern void sim7500e_mobit_process(u8 index);
 //////////////////////////////////////////////////////////////////////////////	 
 
 //系统初始化
@@ -108,15 +109,16 @@ void system_init(void)
 
 #if 0
 	W25QXX_Init();				//初始化W25Q128
-
-	g_sys_env.charge_times = 123;
 	
 	sys_env_init();
 
+	sys_env_save();
 	// Get ENV Params
 	sys_env_dump();
 
 	g_trip_meters_old = g_trip_meters;
+	
+	while(1);
 #endif
 
 	My_RTC_Init();		 		//初始化RTC
@@ -134,6 +136,7 @@ void system_init(void)
 	
 	//VS_Init();	  				//初始化VS1053
   
+#if 0
 	MPU_Init();					//初始化MPU6050
 	delay_ms(200);
 	while(mpu_dmp_init())
@@ -142,6 +145,8 @@ void system_init(void)
 		//usart1_send_char('K');
 	}
 	//mpu_dmp_init();
+#endif
+
 #if 0	
 	delay_ms(1500);
 	
@@ -221,57 +226,6 @@ void start_task(void *pdata)
 	OSTaskSuspend(START_TASK_PRIO);	//挂起起始任务.
 	OS_EXIT_CRITICAL();	//退出临界区(可以被中断打断)
 } 
-
-// Play MP3 task
-void lower_task(void *pdata)
-{
-	while(1) {
-		if (g_mp3_play) {
-			music_play((const char*)g_mp3_play_name);
-
-			g_mp3_play = 0;
-			memset(g_mp3_play_name, 0, 32);
-		}
-
-		printf("test lower task\n");
-   	OSTimeDlyHMSM(0,0,0,500);// 500ms
-	}
-}
-
-void sim7500e_mobit_process(u8 index);
-
-// MPU6050 Check and BT Data Parse
-void main_task(void *pdata)
-{
-	u8 i = 0;
-	u8 loop_cnt = 0;
-	
-	blue_init();
-	while(1) {
-		// TBD: Add MPU6050 Check
-		// TBD: Add Invalid Moving Check
-		// TBD: Add BT Data Parse
-		for (i=0; i<U3_RECV_BUF_CNT; i++) {
-			if (USART3_RX_STA[i]&0X8000) {
-				if (strstr((const char*)(USART3_RX_BUF+U3_RECV_LEN_ONE*i), PROTOCOL_HEAD)) {
-					sim7500e_mobit_process(i);
-				}
-			}
-		}
-		
-		if ((g_trip_meters - g_trip_meters_old) > 10) {// Unit: 0.1KM/BIT
-			g_total_meters += (g_trip_meters - g_trip_meters_old) / 10;
-			g_trip_meters_old = g_trip_meters;
-		}
-
-		// Update total_meters into flash
-		if (50 == loop_cnt) {
-			loop_cnt = 0;
-			// sys_env_save();
-		}
-   		OSTimeDlyHMSM(0,0,0,100);// 500ms
-	}
-}
 
 void create_logfile(void)
 {
@@ -411,20 +365,97 @@ void MPU6050_Risk_Check()
 	}
 }
 
+// Play MP3 task
+void lower_task(void *pdata)
+{
+	float pitch,roll,yaw;
+	short aacx,aacy,aacz;
+	short gyrox,gyroy,gyroz;
+	short temp;
+	u8 ret=0;
+	
+	while(1) {
+		if (g_mp3_play) {
+			music_play((const char*)g_mp3_play_name);
+
+			g_mp3_play = 0;
+			memset(g_mp3_play_name, 0, 32);
+		}
+
+#if 0
+		ret = mpu_dmp_get_data(&pitch,&roll,&yaw);
+		// usart1_send_char(ret);
+		if(ret==0)
+		{ 
+			//printf(" OK \r\n");
+			temp=MPU_Get_Temperature();
+			MPU_Get_Accelerometer(&aacx,&aacy,&aacz);
+			MPU_Get_Gyroscope(&gyrox,&gyroy,&gyroz);
+			//mpu6050_send_data(aacx,aacy,aacz,gyrox,gyroy,gyroz);
+			#if 0
+				usart1_report_imu(aacx,aacy,aacz,gyrox,gyroy,gyroz,(int)(roll*100),(int)(pitch*100),(int)(yaw*10));
+			#else
+				//printf(" (int)(roll*100)=%d ,(int)(pitch*100)=%d ,(int)(yaw*10)=%d \r\n",(int)(roll*100),(int)(pitch*100),(int)(yaw*10));
+				if((pitch*100>4500)||(pitch*100<-4500)||(yaw*10>450)||(yaw*10<-450))
+					printf("FCL \r\n");
+				else
+					printf("MFC \r\n");
+			#endif
+		}
+#endif
+		// printf("test lower task\n");
+		
+   	OSTimeDlyHMSM(0,0,0,500);// 500ms
+	}
+}
+
+// MPU6050 Check and BT Data Parse
+void main_task(void *pdata)
+{
+	u8 i = 0;
+	u8 loop_cnt = 0;
+	
+	// blue_init();
+	while(1) {
+		// TBD: Add MPU6050 Check
+		// TBD: Add Invalid Moving Check
+		// TBD: Add BT Data Parse
+		for (i=0; i<U3_RECV_BUF_CNT; i++) {
+			if (USART3_RX_STA[i]&0X8000) {
+				if (strstr((const char*)(USART3_RX_BUF+U3_RECV_LEN_ONE*i), PROTOCOL_HEAD)) {
+					sim7500e_mobit_process(i);
+				}
+			}
+		}
+		
+		if ((g_trip_meters - g_trip_meters_old) > 10) {// Unit: 0.1KM/BIT
+			g_total_meters += (g_trip_meters - g_trip_meters_old) / 10;
+			g_trip_meters_old = g_trip_meters;
+		}
+
+		// Update total_meters into flash
+		if (50 == loop_cnt) {
+			loop_cnt = 0;
+			// sys_env_save();
+		}
+   		OSTimeDlyHMSM(0,0,0,100);// 500ms
+	}
+}
+
 //执行最不需要时效性的代码
 void usart_task(void *pdata)
 {
 	u8 loop_cnt = 0;
 
 	while(1) {
- 	   if((UART5_RX_STA&(1<<15)) != 0) {
-	       cpr74_read_calypso();
-           UART5_RX_STA = 0;
-        }
+		if((UART5_RX_STA&(1<<15)) != 0) {
+					cpr74_read_calypso();
+          UART5_RX_STA = 0;
+    }
 
-        if (loop_cnt++ == 3) {
-            loop_cnt = 0;
-            printf("Hall Counter = %d\n", pluse_num_new);
+		if (loop_cnt++ == 3) {
+				loop_cnt = 0;
+        printf("Hall Counter = %d\n", pluse_num_new);
 		}
 
 #if 1
@@ -454,7 +485,7 @@ void higher_task(void *pdata)
 {
 	while (1) {
 		sim7500e_communication_loop(0,NULL,NULL);
-    	OSTimeDlyHMSM(0,0,0,500);// 500ms
+    OSTimeDlyHMSM(0,0,0,500);// 500ms
 	}
 }
 

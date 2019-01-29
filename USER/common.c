@@ -29,6 +29,7 @@ void sys_env_save(void)
 	strcpy(sys_env.svr_ip, "47.105.112.41");
 	strcpy(sys_env.svr_apn, "CMNET");
 	strcpy(sys_env.svr_port, "88");
+	g_bms_charged_times = 123;
 	sys_env.charge_times = g_bms_charged_times;
 	sys_env.total_meters = g_total_meters;
 
@@ -64,9 +65,9 @@ void sys_env_dump(void)
 		memcpy(g_svr_ip, sys_env.svr_ip, 32);
 		memcpy(g_svr_port, sys_env.svr_port, 8);
 		memcpy(g_svr_apn, sys_env.svr_apn, 32);
-		printf("svr_ip = %d\n", sys_env.svr_ip);
-		printf("svr_port = %d\n", sys_env.svr_port);
-		printf("svr_apn = %d\n", sys_env.svr_apn);
+		printf("svr_ip = %s\n", sys_env.svr_ip);
+		printf("svr_port = %s\n", sys_env.svr_port);
+		printf("svr_apn = %s\n", sys_env.svr_apn);
 	} else {
 		printf("haven't saved env params before\n");
 	}
