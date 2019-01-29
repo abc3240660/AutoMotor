@@ -1,5 +1,6 @@
 #include "can1.h"
 #include "led.h"
+#include "sim900a.h"
 
 extern u8 g_door_state;
 extern u8 g_power_state;
@@ -142,11 +143,11 @@ u8 CAN1_Receive_Msg(u8 *buf)
 	// BIT3-ShaCheTaBan: 0-Down / 1-Release
 	// BIT4-ACC12: 0-LowLevel / 1-HighLevel
 	// BIT5-ON12: 0-LowLevel / 1-HighLevel
-	// BIT6&7-DangWei: 00-OFF / 01-ACC / 10-ON
+	// BIT6&7-PEPS DangWei: 00-OFF / 01-ACC / 10-ON
 	// Byte2:
 	// BIT0-lamp: 0-OFF / 1-ON
 	// BIT1-ring: 0-OFF / 1-ON
-	if (0x100850C8 == RxMessage.ExtId) {
+	if (0x100850C8 == RxMessage.ExtId) {// PEPS
 		if (0x02 == (RxMessage.Data[0]&0x2)) {// locked
 			if (1 == g_drlock_sta_chged) {
 				g_drlock_sta_chged = 0;
@@ -170,6 +171,14 @@ u8 CAN1_Receive_Msg(u8 *buf)
 		}
 
 		g_drlock_sta_chged |= 0x80;
+	// Byte1:
+	// BIT0~1: 00-N, 01-D, 10-R
+	// Byte2:Speed LB(rpm/bit)
+	// Byte3:Speed HB(rpm/bit)
+	// Byte6:TripMeter LB(rpm/bit)
+	// Byte7:TripMeter HB(rpm/bit)
+	// TBD: TotalMeter need to calc
+	} else if (0x10F8109A == RxMessage.ExtId) {// MC3624
 	}
 
 	return RxMessage.DLC;	
