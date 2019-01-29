@@ -40,7 +40,7 @@ u8 g_invaid_move = 0;
 
 u8 g_calypso_active = 0;
 
-// BT(if no BT, use SIM)
+// TBD: Get BT MAC
 u8 g_mac_addr[32] = "";
 u8 g_iccid_sim[32] = "";
 u8 g_rssi_sim[32] = "";
@@ -59,9 +59,13 @@ u8 gps_temp_dat5[32] = "";
 u16 g_need_ack1 = 0;
 u16 g_need_ack2 = 0;
 
-u8 g_hbeaterrcnt = 0;			//心跳错误计数器,连续5次心跳信号无应答,则重新连接
+u8 g_hbeaterrcnt = 0;
 
 u16 g_car_sta = 0;
+
+u8 g_svr_ip[32]  = "";
+u8 g_svr_port[8] = "";
+u8 g_svr_apn[32] = "";
 
 u8 USART3_RX_BUF_BAK[U3_RECV_LEN_ONE];
 u8 USART3_RX_BUF_BAK_MOBIT[U3_RECV_LEN_ONE];
@@ -966,6 +970,8 @@ u8 sim7500e_setup_connect(void)
 
 	sim7500dev.tcp_status=0;// IDLE
 	
+	sprintf(send_buf, "AT+CIPSTART=\"TCP\",\"%s\",%s", g_svr_ip, g_svr_port);
+
 	i = 0;
 	while (1) {
 		// sim7500e_send_cmd("AT+CIPSHUT","SHUT OK",200);

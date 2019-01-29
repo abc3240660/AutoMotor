@@ -27,6 +27,10 @@
 typedef struct {
 	u16 active_flag;
 	u16 charge_times;
+	u32 total_meters;
+	u8 svr_ip[32];
+	u8 svr_port[8];
+	u8 svr_apn[32];
 } SYS_ENV;
 
 void sys_env_init(void);

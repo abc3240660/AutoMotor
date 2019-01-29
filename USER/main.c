@@ -75,6 +75,11 @@ void write_logs(char *module, char *log, u16 size, u8 mode);
 
 u8 g_mp3_play = 0;
 u8 g_mp3_play_name[32] = "";
+
+u32 g_trip_meters = 0;
+u32 g_trip_meters_old = 0;
+u32 g_total_meters = 0;
+
 extern u8 g_mp3_update_name[128];
 extern u8 g_mp3_update;
 extern u8 g_dw_write_enable;
@@ -108,8 +113,10 @@ void system_init(void)
 	
 	sys_env_init();
 
-	// Get g_bms_charged_times
+	// Get ENV Params
 	sys_env_dump();
+
+	g_trip_meters_old = g_trip_meters;
 #endif
 
 	My_RTC_Init();		 		//³õÊ¼»¯RTC
@@ -237,6 +244,7 @@ void sim7500e_mobit_process(u8 index);
 void main_task(void *pdata)
 {
 	u8 i = 0;
+	u8 loop_cnt = 0;
 	
 	blue_init();
 	while(1) {
@@ -251,7 +259,17 @@ void main_task(void *pdata)
 			}
 		}
 		
-   	OSTimeDlyHMSM(0,0,0,100);// 500ms
+		if ((g_trip_meters - g_trip_meters_old) > 10) {// Unit: 0.1KM/BIT
+			g_total_meters += (g_trip_meters - g_trip_meters_old) / 10;
+			g_trip_meters_old = g_trip_meters;
+		}
+
+		// Update total_meters into flash
+		if (50 == loop_cnt) {
+			loop_cnt = 0;
+			// sys_env_save();
+		}
+   		OSTimeDlyHMSM(0,0,0,100);// 500ms
 	}
 }
 

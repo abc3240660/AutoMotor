@@ -5,6 +5,7 @@
 extern u8 g_door_state;
 extern u8 g_power_state;
 extern u8 g_drlock_sta_chged;
+extern u32 g_trip_meters;
 /****************************************************************************
 * 名    称: u8 CAN1_Mode_Init(u8 mode)
 * 功    能：CAN初始化
@@ -175,10 +176,11 @@ u8 CAN1_Receive_Msg(u8 *buf)
 	// BIT0~1: 00-N, 01-D, 10-R
 	// Byte2:Speed LB(rpm/bit)
 	// Byte3:Speed HB(rpm/bit)
-	// Byte6:TripMeter LB(rpm/bit)
-	// Byte7:TripMeter HB(rpm/bit)
+	// Byte6:TripMeter LB(0.1km/bit)
+	// Byte7:TripMeter HB(0.1km/bit)
 	// TBD: TotalMeter need to calc
 	} else if (0x10F8109A == RxMessage.ExtId) {// MC3624
+		g_trip_meters = (RxMessage.Data[7]<<8) + RxMessage.Data[6]
 	}
 
 	return RxMessage.DLC;	
