@@ -202,14 +202,13 @@ u8 sim7500e_ipsta_check(u8 *sta)
 	if (strstr((const char*)USART3_RX_BUF_BAK, "CONNECT OK")) {
 		*sta = 1;
 	}
+	
+	return NULL;
 }
 
 u8 sim7500e_mp3_dw_check(void)
 {
 	u16 i = 0;
-	u32 br = 0;
-	u8 res = 0;
-	FIL f_txt;
 	u16 size = 0;
 	u16 size_pos = 0;
 	u16 data_pos = 0;
@@ -234,7 +233,7 @@ u8 sim7500e_mp3_dw_check(void)
 		}
 	}
 
-	size = atoi(size_str);
+	size = atoi((const char*)size_str);
 
 	g_data_pos = data_pos;
 	g_data_size = size;
@@ -354,7 +353,6 @@ u8 sim7500e_gps_check(void)
 
 u8* sim7500e_check_cmd(u8 *str, u8 index)
 {
-	u8 i = 0;
 	char *strx = 0;
 
 #if 0
@@ -927,10 +925,11 @@ void sim7500e_parse_msg(char* msg)
 u8 sim7500e_setup_connect(void)
 {
 	u8 i = 0;
-
+	u8 iap_success = 0;
+	
 	sim7500dev.tcp_status=0;// IDLE
 	
-	if ((strlen(g_svr_ip)>0) && (strlen(g_svr_port)>0)) {
+	if ((strlen((const char*)g_svr_ip)>0) && (strlen((const char*)g_svr_port)>0)) {
 		memset(send_buf, 0, LEN_MAX_SEND);
 		sprintf(send_buf, "AT+CIPSTART=\"TCP\",\"%s\",%s", g_svr_ip, g_svr_port);
 	} else {
@@ -941,7 +940,7 @@ u8 sim7500e_setup_connect(void)
 	while (1) {
 		// sim7500e_send_cmd("AT+CIPSHUT","SHUT OK",200);
 		// if (sim7500e_send_cmd("AT+CIPSTART=\"TCP\",\"47.105.112.41\",88", "CONNECT",600)) {// Max 600*50ms = 30s		
-		if (sim7500e_send_cmd(send_buf, "CONNECT",600)) {// Max 600*50ms = 30s		
+		if (sim7500e_send_cmd((u8*)send_buf, "CONNECT",600)) {// Max 600*50ms = 30s		
 			if(sim7500e_send_cmd("AT+CIPSHUT","SHUT OK",200)) {
 				delay_ms(1000);
 				sim7500e_send_cmd("AT+CIPSHUT","SHUT OK",200);
@@ -964,11 +963,11 @@ u8 sim7500e_setup_connect(void)
 
 	if (1 == sim7500dev.tcp_status) {// Connected OK
 		delay_ms(10);
-		if (sim7500e_do_dev_register_auto(send_buf)) return 1;
+		if (sim7500e_do_dev_register_auto()) return 1;
 		delay_ms(10);
 
 		if (iap_success) {
-			sim7500e_do_iap_success_report(send_buf);
+			sim7500e_do_iap_success_report();
 		}
 
 		return 0;
@@ -1019,14 +1018,14 @@ u8 sim7500e_setup_initial(void)
 		if(sim7500e_send_cmd("AT+CIPSHUT","SHUT OK",200)) return 1;
 	}
 	
-	if (0 == strlen(g_svr_apn)) {
+	if (0 == strlen((const char*)g_svr_apn)) {
 		return 1;
 	}
 
 	memset(send_buf, 0, LEN_MAX_SEND);
 	sprintf(send_buf, "AT+CSTT=\"%s\"", g_svr_apn);
-	if(sim7500e_send_cmd(send_buf,"OK",40)) {
-		if(sim7500e_send_cmd(send_buf,"OK",40)) return 1;
+	if(sim7500e_send_cmd((u8*)send_buf,"OK",40)) {
+		if(sim7500e_send_cmd((u8*)send_buf,"OK",40)) return 1;
 	}
 	
 	if(sim7500e_send_cmd("AT+CIICR","OK",200)) {
@@ -1050,14 +1049,14 @@ u8 sim7500e_setup_http(void)
 	sim7500e_send_cmd("AT+SAPBR=0,1","XXX",100);
 	delay_ms(1000);
 	
-	if (0 == strlen(g_svr_apn)) {
+	if (0 == strlen((const char*)g_svr_apn)) {
 		return 1;
 	}
 
 	memset(send_buf, 0, LEN_MAX_SEND);
 	sprintf(send_buf, "AT+SAPBR=3,1,\"APN\",\"%s\"", g_svr_apn);
-	if (sim7500e_send_cmd(send_buf,"OK",500)) {
-		if (sim7500e_send_cmd(send_buf,"OK",500)) return 1;
+	if (sim7500e_send_cmd((u8*)send_buf,"OK",500)) {
+		if (sim7500e_send_cmd((u8*)send_buf,"OK",500)) return 1;
 	}
 	
 	if (sim7500e_send_cmd("AT+SAPBR=1,1","OK",500)) {
@@ -1083,7 +1082,7 @@ u8 sim7500e_setup_http(void)
 	if (sim7500e_send_cmd("AT+HTTPACTION=0","+HTTPACTION: 0,200",500)) {
 		if (sim7500e_send_cmd("AT+HTTPACTION=0","+HTTPACTION: 0,200",500)) return 1;
 	}
-	g_dw_size_total = atoi(USART3_RX_BUF_BAK+21);
+	g_dw_size_total = atoi((const char*)(USART3_RX_BUF_BAK+21));
 	printf("g_dw_size_total = %d\n", g_dw_size_total);
 	
 	return 0;
@@ -1092,34 +1091,34 @@ u8 sim7500e_setup_http(void)
 void sim7500e_idle_actions(void)
 {
 	if (g_calypso_active) {
-		sim7500e_do_calypso_report(send_buf);
+		sim7500e_do_calypso_report();
 		g_calypso_active = 0;
 	}
 	if (g_drlock_sta_chged&0x80) {// Door Changed
 		if (g_drlock_sta_chged&0x01) {// OPEN
-			sim7500e_do_door_opened_report(send_buf);
+			sim7500e_do_door_opened_report();
 		} else {// CLOSE
-			sim7500e_do_door_closed_report(send_buf);
+			sim7500e_do_door_closed_report();
 		}
 		g_drlock_sta_chged &= 0x7F;
 	}
 	if (g_bms_charge_sta_chged&0x80) {// Charge Changed
 		if (g_bms_charge_sta_chged&0x01) {// Start
-			sim7500e_do_charge_start_report(send_buf);
+			sim7500e_do_charge_start_report();
 		} else {// Stop
-			sim7500e_do_charge_stop_report(send_buf);
+			sim7500e_do_charge_stop_report();
 		}
 		g_bms_charge_sta_chged &= 0x7F;
 	}
 	if (g_invaid_move) {
 		g_invaid_move = 0;
-		sim7500e_do_invalid_moving_report(send_buf);
+		sim7500e_do_invalid_moving_report();
 	}
 	if (g_gps_trace_gap) {
 		// every loop delay 10ms
 		if (1 == g_gps_active) {
 			g_gps_trace_gap = 0;
-			sim7500e_do_gps_location_report(send_buf);
+			sim7500e_do_gps_location_report();
 		}
 	}
 	if (g_iap_update) {
@@ -1156,7 +1155,7 @@ void sim7500e_idle_actions(void)
 			}
 
 			sprintf(send_buf, "AT+HTTPREAD=%d,%d", g_dw_recved_sum, split_size);
-			if (0 == sim7500e_send_cmd(send_buf,"+HTTPREAD",500)) {
+			if (0 == sim7500e_send_cmd((u8*)send_buf,"+HTTPREAD",500)) {
 				if (sim7500e_mp3_dw_check()) {
 					return;
 				}
@@ -1165,7 +1164,7 @@ void sim7500e_idle_actions(void)
 			printf("g_dw_recved_sum = %d\n", g_dw_recved_sum);
 			if (g_dw_recved_sum == g_dw_size_total) {
 				g_mp3_update = 0;
-				sim7500e_do_mp3_dw_success_ack(send_buf);
+				sim7500e_do_mp3_dw_success_ack();
 			}
 		}
 	}
@@ -1199,7 +1198,7 @@ void sim7500e_mobit_process(u8 index)
 		
 		printf("RECVED MSG(%dB): %s\n", data_lenth, USART3_RX_BUF_BAK_MOBIT);
 				
-		sim7500e_parse_msg(USART3_RX_BUF_BAK_MOBIT, send_buf);
+		sim7500e_parse_msg((char*)USART3_RX_BUF_BAK_MOBIT);
 	}
 	
 	USART3_RX_STA[index] = 0;// Go on receiving other packages ASAP
@@ -1268,10 +1267,8 @@ void sim7500e_mobit_msg_ack(void)
 /////////////////////////////////////////////////////////////////////////////////////////////////////////// 
 void sim7500e_communication_loop(u8 mode,u8* ipaddr,u8* port)
 {
-	u8 i = 0;
 	u8 rtc_gap = 0;
 	u8 connectsta = 0;// 0-idle 1-connected 2-disconnect
-	u8 iap_success = 0;
 
 	u16 timex = 0;
 	
@@ -1316,7 +1313,7 @@ void sim7500e_communication_loop(u8 mode,u8* ipaddr,u8* port)
 
 			if ((0 == (timex%(g_hbeat_gap*100)) || (rtc_gap > g_hbeat_gap))) {// 10ms per loop
 				rtc_gap = 0;
-				RTC_TimeStruct_old.RTC_Seconds = RTC_TimeStruct_cur.RTC_Seconds
+				RTC_TimeStruct_old.RTC_Seconds = RTC_TimeStruct_cur.RTC_Seconds;
 
 				// Get RSSI
 				if(sim7500e_send_cmd("AT+CSQ","OK",100)) {
@@ -1325,7 +1322,7 @@ void sim7500e_communication_loop(u8 mode,u8* ipaddr,u8* port)
 				
 				sim7500e_rssi_check();
 	
-				sim7500e_do_heart_beat_auto(send_buf);
+				sim7500e_do_heart_beat_auto();
 
 				g_hbeaterrcnt++;
 				printf("hbeaterrcnt = %d\r\n",g_hbeaterrcnt);

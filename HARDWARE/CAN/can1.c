@@ -180,7 +180,7 @@ u8 CAN1_Receive_Msg(u8 *buf)
 	// Byte7:TripMeter HB(0.1km/bit)
 	// TBD: TotalMeter need to calc
 	} else if (0x10F8109A == RxMessage.ExtId) {// MC3624
-		g_trip_meters = (RxMessage.Data[7]<<8) + RxMessage.Data[6]
+		g_trip_meters = (RxMessage.Data[7]<<8) + RxMessage.Data[6];
 	}
 
 	return RxMessage.DLC;	

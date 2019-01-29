@@ -388,7 +388,7 @@ extern void USART3_Get_Free_Buf(void);
 void TIM7_IRQHandler(void)
 { 	
 	u8 i = 0;
-	u8 is_dw_dat = 0
+	u8 is_dw_dat = 0;
 	
 	OSIntEnter();    		    
 	if(TIM_GetITStatus(TIM7,TIM_IT_Update)==SET)
