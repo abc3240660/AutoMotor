@@ -5,7 +5,7 @@
 #include "stdio.h"
 #include "common.h"
 
-void hc08_init();
-void hc08_query_sta();
+void hc08_init(void);
+void hc08_query_sta(void);
 
 #endif	   

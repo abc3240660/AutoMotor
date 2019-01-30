@@ -147,7 +147,7 @@ void TIM3_IRQHandler(void)
 			UART6_RX_BUF[UART6_RX_STA&0X7FFF] = 0;
 
 			// AT ACKs
-			if ((0xA3==UART6_RX_BUF[0]) && (0xA4==UART6_RX_BUF[0])) {
+			if ((0xA3==UART6_RX_BUF[0]) && (0xA4==UART6_RX_BUF[1])) {
 				hc08_msg_process(UART6_RX_BUF, UART6_RX_STA&0X7FFF);
 				UART6_RX_STA = 0;
 			} else {// User MSGs

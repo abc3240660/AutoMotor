@@ -66,7 +66,7 @@ void usart6_init(u32 bound)
 
 	TIM3_Int_Init(500-1,8400-1);	//10ms中断一次
 	
-  	TIM_Cmd(TIM3, DISABLE); //关闭定时器7
+  TIM_Cmd(TIM3, DISABLE); //关闭定时器7
 	
 	UART6_RX_STA=0;				//清零 
 }
@@ -87,14 +87,14 @@ void UART6_SendData(u8 *str, u16 strlen)
 } 
 
 vu16 UART6_RX_STA = 0;
-void UART6_IRQHandler(void)
+void USART6_IRQHandler(void)
 {
 	u8 res = 0;
 
 	OSIntEnter();    
 
-	if (USART_GetFlagStatus(UART6, USART_FLAG_RXNE) != RESET) {
-		res = USART_ReceiveData(UART6);
+	if (USART_GetFlagStatus(USART6, USART_FLAG_RXNE) != RESET) {
+		res = USART_ReceiveData(USART6);
 		if (0 == (UART6_RX_STA&(1<<15))) {
 			if (UART6_RX_STA < UART6_MAX_RECV_LEN) {
 				TIM_SetCounter(TIM3, 0);

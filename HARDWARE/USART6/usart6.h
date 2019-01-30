@@ -28,7 +28,7 @@ extern u8  UART6_TX_BUF[UART6_MAX_SEND_LEN]; 		//发送缓冲,最大UART6_MAX_SEND_LEN
 extern vu16 UART6_RX_STA;   						//接收数据状态
 
 void usart6_init(u32 bound);
-void uart6SendChars(u8 *str, u16 strlen);
+void UART6_SendData(u8 *str, u16 strlen);
 
 #endif	   
 
