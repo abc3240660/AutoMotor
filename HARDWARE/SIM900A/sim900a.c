@@ -43,10 +43,9 @@ u8 g_invaid_move = 0;
 
 u8 g_calypso_active = 0;
 
-// TBD: Get BT MAC
-u8 g_mac_addr[32] = "88888888";
+u8 g_mac_addr[32]  = "";
+u8 g_rssi_sim[32]  = "";
 u8 g_iccid_sim[32] = "";
-u8 g_rssi_sim[32] = "";
 
 u8 g_bms_temp_max = 30;// 30
 u8 g_bms_temp_min = 30;// 30
@@ -374,7 +373,6 @@ u8* sim7500e_check_cmd(u8 *str, u8 index)
 	// CONNECT's actual result ACK maybe recved 150sec later after "OK"
 	// very very long time wait, so must wait till recved CONNECT or ERROR
 	
-	// TBD: Check TCP Server Closed's AT-ACK
 	if (strstr((const char*)(USART3_RX_BUF+U3_RECV_LEN_ONE*index), "CLOSED")) {
 		sim7500dev.tcp_status = 2;
 	}
@@ -413,7 +411,6 @@ void sim7500e_clear_recved_buf()
 	for (i=0; i<U3_RECV_BUF_CNT; i++) {
 		if (USART3_RX_STA[i]&0X8000) {
 			if (!strstr((const char*)(USART3_RX_BUF+U3_RECV_LEN_ONE*i), "^MOBIT")) {
-				// TBD: Check TCP Server Closed's AT-ACK
 				if (strstr((const char*)(USART3_RX_BUF+U3_RECV_LEN_ONE*i), "CLOSED")) {
 					sim7500dev.tcp_status = 2;
 				}
@@ -562,6 +559,13 @@ void sim7500e_do_query_car_ack()
 {
 	u8 car_status[12] = "";
 
+	// TBD: Add IO for Input
+	if (0 == KEY_HAND_BRAKE) {
+		g_car_sta &= ~(1<<BIT_HAND_BRAKE);
+	} else {
+		g_car_sta |= (1<<BIT_HAND_BRAKE);
+	}
+
 	car_status[0] = (g_car_sta&BIT_HAND_BRAKE)?'1':'0';
 	car_status[1] = (g_car_sta&BIT_FAR_LED)?'1':'0';
 	car_status[2] = (g_car_sta&BIT_NEAR_LED)?'1':'0';
@@ -673,7 +677,7 @@ void sim7500e_do_query_bms_ack()
 // DEV ACK
 void sim7500e_do_query_mp3_ack()
 {
-	// TBD: send buf size maybe not enough
+	// MAX Length = 256
 	memset(send_buf_main, 0, LEN_MAX_SEND);
 	// TBD: Scan files
 	// sprintf(send_buf_main, "%s,%s,%s,%s,%s,%d,%d,%d$", PROTOCOL_HEAD, DEV_TAG, g_imei_str, CMD_DEV_ACK, CMD_QUERY_MP3, g_bms_battery_vol, g_bms_charged_times, g_bms_temp_max);
@@ -715,6 +719,11 @@ void sim7500e_do_heart_beat_auto()
 
 	sprintf((char*)dev_time,"20%02d%02d%02d%02d%02d%02d",RTC_DateStruct.RTC_Year,RTC_DateStruct.RTC_Month,RTC_DateStruct.RTC_Date,RTC_TimeStruct.RTC_Hours,RTC_TimeStruct.RTC_Minutes,RTC_TimeStruct.RTC_Seconds);
 
+	if (0 == KEY_HAND_BRAKE) {
+		g_car_sta &= ~(1<<BIT_HAND_BRAKE);
+	} else {
+		g_car_sta |= (1<<BIT_HAND_BRAKE);
+	}
 
 	car_status[0] = (g_car_sta&BIT_HAND_BRAKE)?'1':'0';
 	car_status[1] = (g_car_sta&BIT_FAR_LED)?'1':'0';
@@ -900,7 +909,6 @@ void sim7500e_parse_msg(char* msg)
 				strcpy((char*)g_mp3_play_name, split_str);
 				printf("g_mp3_play_name = %s\n", g_mp3_play_name);
 				
-				// TBD: need to be placed in right positon
 				sim7500e_do_mp3_play_ack();
 			} else if (MP3_UPDATE == cmd_type) {
 				if (4 == index) {
@@ -1015,9 +1023,6 @@ u8 sim7500e_setup_initial(void)
 		if(sim7500e_send_cmd("AT+CCID","OK",40)) return 1;
 	}
 	sim7500e_iccid_check();
-	
-	// TBD: Get MAC of BT
-	// (SIM7000E no mac)
 	
 	// Open GPS
 	if(sim7500e_send_cmd("AT+CGNSPWR=1","OK",40)) {

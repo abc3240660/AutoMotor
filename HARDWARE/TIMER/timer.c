@@ -4,15 +4,12 @@
 #include "includes.h"
 #include "usart3.h" 
 #include "usart5.h" 
-
-extern u8 ov_frame;
-extern volatile u16 jpeg_data_len;
-extern void usbapp_pulling(void); 
+#include "usart6.h" 
 
 void write_logs(char *module, char *log, u16 size, u8 mode);
+void hc08_msg_process(u8 *data, u16 num);
 
-vu8 framecnt;
-vu8 framecntout;
+extern u8 g_mac_addr[32];
 
 void TIM2_Init(u16 auto_data,u16 fractional)
 {
@@ -139,18 +136,29 @@ void TIM4_Init(u16 auto_data,u16 fractional)
 }
 
 void TIM3_IRQHandler(void)
-{ 		
+{
 	OSIntEnter();   
 	if(TIM_GetITStatus(TIM3,TIM_IT_Update)==SET)
 	{
-		if(OSRunning!=TRUE)
-		{
-//			usbapp_pulling();
+		u8 i = 0;
+
+		if (UART6_RX_STA != 0) {
+			UART6_RX_STA |= 1<<15;
+			UART6_RX_BUF[UART6_RX_STA&0X7FFF] = 0;
+
+			// AT ACKs
+			if ((0xA3==UART6_RX_BUF[0]) && (0xA4==UART6_RX_BUF[0])) {
+				hc08_msg_process(UART6_RX_BUF, UART6_RX_STA&0X7FFF);
+				UART6_RX_STA = 0;
+			} else {// User MSGs
+				printf("HC08 AT ACK: %s\n", UART6_RX_BUF);
+			}
 		}
-		framecntout=framecnt;
- 		framecnt=0;
-	}				   
+
 		TIM_ClearITPendingBit(TIM3,TIM_IT_Update);
+		TIM_Cmd(TIM3,DISABLE);
+
+	}				   
 	OSIntExit(); 	    		  			    
 }
 

@@ -3,10 +3,6 @@
 #include "sys.h"
 #include "includes.h"
 
-//硬件平台软硬件版本定义	   	
-#define HARDWARE_VERSION	   		15		//硬件版本,放大10倍,如1.0表示为10
-#define SOFTWARE_VERSION	    	200		//软件版本,放大100倍,如1.00,表示为100
-
 // For VS1003 to Suport Double HW Board
 #define QMXX_STM32 1
 
@@ -20,7 +16,10 @@
 #define FALSE   0
 #endif 
 
-//π值定义
+
+// #define HC08_ENABLE 1
+// #define MPU_ENABLE 1
+
 #define	app_pi	3.1415926535897932384626433832795 
 /////////////////////////////////////////////////////////////////////////
 

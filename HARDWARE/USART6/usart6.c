@@ -6,9 +6,10 @@
 #include "timer.h"
 #include "ucos_ii.h"
 #include "blue.h"
-u8 receive_str[UART6_REC_NUM];     //接收缓存数组,最大USART_REC_LEN个字节 
-u8 uart_byte_count=0;
-u8 APP_mode=0; 
+
+__align(8) u8 UART6_TX_BUF[UART6_MAX_SEND_LEN]; 	//发送缓冲,最大UART6_MAX_SEND_LEN字节
+u8 UART6_RX_BUF[UART6_MAX_RECV_LEN]; 				//接收缓冲,最大UART6_MAX_RECV_LEN个字节.
+
 void usart6_init(u32 bound)
 {   
 	GPIO_InitTypeDef GPIO_InitStructure;
@@ -62,64 +63,51 @@ void usart6_init(u32 bound)
 	delay_ms(500);
 	delay_ms(500);
 	PDout(0) = 1;
-}
-void uart6SendChar(u8 ch)
-{      
-	while((USART6->SR&0x40)==0);  
-    USART6->DR = (u8) ch;      
-}
-void uart6SendChars(u8 *str, u16 strlen)
-{ 
-	u16 k= 0 ; 
-	do{
-		uart6SendChar(*(str + k)); k++; 
-	}while (k < strlen); //循环发送,直到发送完毕   
-    
-} 
-extern CTRL_DATA cdata;
-u16 magic_data=0;
-u8 magic_flag=0;
-u8 temp[2];
-u8 pos=0;
-u8 total_len;
-void USART6_IRQHandler(void)
-{
-	u8 rec_data;
-	u8 *p;
+
+	TIM3_Int_Init(500-1,8400-1);	//10ms中断一次
 	
-	if(USART_GetITStatus(USART6, USART_IT_RXNE) != RESET)  //接收中断 
-	{
-		if(magic_flag==0)
-		{//还未收到头数据
-			temp[pos++] =(u8)USART_ReceiveData(USART6);
-			if(pos==1)
-			{
-				pos=0;
-				if(temp[0]==(MIAGIC_ID>>8) && temp[1]==(MIAGIC_ID&0xFF))
-				{
-					magic_flag=1;//已经收到头，后面接收的就是数据
-					cdata.data.magic[0] = temp[0];
-					cdata.data.magic[1] = temp[1];
-					p = (u8 *)(&cdata.data)+2;
-					total_len=2;
-				}else{
-					total_len=0;
-				}
-			}
-		}else{
-			//开始接受数据
-			*p = (u8)USART_ReceiveData(USART6);
-			p++;
-			total_len++;
-			if((cdata.data.len+7)==total_len)
-			{
-				//完整的数据包接受完了
-				cdata.valid=1;//可以处理数据了
-				magic_flag=0;//等待下一个包头
-			}
-		}
-		
-		printf("%c",rec_data);
-	}
+  	TIM_Cmd(TIM3, DISABLE); //关闭定时器7
+	
+	UART6_RX_STA=0;				//清零 
 }
 
+void UART6_SendChar(u8 ch)
+{      
+	while ((USART6->SR&0x40)==0);
+    USART6->DR = (u8) ch;
+}
+
+void UART6_SendData(u8 *str, u16 strlen)
+{ 
+	u16 k = 0;
+
+	do {
+		UART6_SendChar(*(str + k)); k++;
+	} while (k < strlen);
+} 
+
+vu16 UART6_RX_STA = 0;
+void UART6_IRQHandler(void)
+{
+	u8 res = 0;
+
+	OSIntEnter();    
+
+	if (USART_GetFlagStatus(UART6, USART_FLAG_RXNE) != RESET) {
+		res = USART_ReceiveData(UART6);
+		if (0 == (UART6_RX_STA&(1<<15))) {
+			if (UART6_RX_STA < UART6_MAX_RECV_LEN) {
+				TIM_SetCounter(TIM3, 0);
+				if (0 == UART6_RX_STA) {
+					TIM_Cmd(TIM3, ENABLE);
+				}
+
+				UART6_RX_BUF[UART6_RX_STA++] = res;
+			} else {
+				UART6_RX_STA |= 1<<15;
+			} 
+		}
+	}  											 
+
+	OSIntExit();  											 
+}

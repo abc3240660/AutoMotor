@@ -82,8 +82,6 @@ void music_play(const char* mp3name)
 
 	// 0~254
 	vsset.mvol=254;
-	mp3_play("0:/MUSIC/ship.mp3");
+	mp3_play(mp3name);
 }
-
-
 

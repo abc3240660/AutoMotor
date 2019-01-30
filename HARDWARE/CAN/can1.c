@@ -2,6 +2,7 @@
 #include "led.h"
 #include "sim900a.h"
 
+extern u16 g_car_sta;
 extern u8 g_door_state;
 extern u8 g_power_state;
 extern u32 g_trip_meters;
@@ -161,8 +162,12 @@ u8 CAN1_Receive_Msg(u8 *buf)
 
 		if (0x01 == (RxMessage.Data[0]&0x1)) {// Opened
 			g_door_state = 1;
+			g_car_sta |= (1<<BIT_LEFT_DOOR);
+			g_car_sta |= (1<<BIT_RIGHT_DOOR);
 		} else {// Closed
 			g_door_state = 0;
+			g_car_sta &= ~(1<<BIT_LEFT_DOOR);
+			g_car_sta &= ~(1<<BIT_RIGHT_DOOR);
 		}
 
 		if (0x20 == (RxMessage.Data[0]&0x20)) {// Power ON
@@ -180,6 +185,10 @@ u8 CAN1_Receive_Msg(u8 *buf)
 	// Byte7:TripMeter HB(0.1km/bit)
 	// TBD: TotalMeter need to calc
 	} else if (0x10F8109A == RxMessage.ExtId) {// MC3624
+		// Get N/D/R
+		g_car_sta &= 0xFF;
+		g_car_sta |= (((RxMessage.Data[0])&0x03)<<8);
+
 		g_trip_meters = (RxMessage.Data[7]<<8) + RxMessage.Data[6];
 	}
 
