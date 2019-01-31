@@ -64,6 +64,7 @@ u32 g_total_meters = 0;
 extern int pluse_num_new;
 extern u8 g_mp3_update_name[LEN_FILE_NAME+1];
 extern u8 g_mp3_update;
+extern u8 g_iap_update;
 extern u8 g_dw_write_enable;
 extern vu16 g_data_pos;
 extern vu16 g_data_size;
@@ -465,22 +466,33 @@ void usart_task(void *pdata)
 		if ((UART5_RX_STA&(1<<15)) != 0) {
 			cpr74_read_calypso();
 			UART5_RX_STA = 0;
-	}
+        }
 
-	if (loop_cnt++ == 3) {
-		loop_cnt = 0;
-        // printf("Hall Counter = %d\n", pluse_num_new);
-	}
+        if (loop_cnt++ == 3) {
+            loop_cnt = 0;
+            // printf("Hall Counter = %d\n", pluse_num_new);
+        }
 
 		if (1 == g_dw_write_enable) {
 			if (1 == g_sd_existing) {
 				u32 br = 0;
 				u8 res = 0;
 				FIL f_txt;
-				u8 mp3_file[32] = "";
+                if (g_mp3_update != 0) {
+                    u8 mp3_file[LEN_FILE_NAME+1] = "";
 
-				sprintf((char*)mp3_file, "0:/%s.wav", g_mp3_update_name);
-				res = f_open(&f_txt,(const TCHAR*)mp3_file,FA_READ|FA_WRITE);
+                    if (strlen((const char*)g_mp3_update_name) > 40) {
+                        g_mp3_update = 0;
+                        printf("file name is too long\n");
+                        continue;
+                    }
+
+                    sprintf((char*)mp3_file, "0:/%s.wav", g_mp3_update_name);
+                    res = f_open(&f_txt,(const TCHAR*)mp3_file,FA_READ|FA_WRITE);
+                } else if (g_iap_update != 0) {
+                    res = f_open(&f_txt,(const TCHAR*)"0:/TEST.BIN",FA_READ|FA_WRITE);
+                }
+
 				if (0 == res) {
 					f_lseek(&f_txt, f_txt.fsize);
 					f_write(&f_txt, USART3_RX_BUF_BAK+g_data_pos, g_data_size, (UINT*)&br);
