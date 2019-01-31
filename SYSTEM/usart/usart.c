@@ -131,7 +131,7 @@ extern u8 g_drlock_sta_chged;
 extern u8 g_invaid_move;
 extern u8 g_bms_charge_sta_chged;
 extern u8 g_mp3_play;
-extern u8 g_mp3_play_name[32];
+extern u8 g_mp3_play_name[LEN_FILE_NAME+1];
 extern int g_gps_trace_gap;
 
 void debug_process(void)
@@ -157,9 +157,9 @@ void debug_process(void)
 		g_bms_charge_sta_chged = 0;
 		g_bms_charge_sta_chged |= 0x80; 
 	} else if (0 == strncmp((const char*)USART_RX_BUF, PLAY_MP3_MUSIC, strlen(PLAY_MP3_MUSIC))) {
-		memset(g_mp3_play_name, 0, 32);
-		strcpy((char*)g_mp3_play_name, (const char*)(USART_RX_BUF+strlen(PLAY_MP3_MUSIC)));
-		// printf("g_mp3_play_name = %s\n", g_mp3_play_name);
+		memset(g_mp3_play_name, 0, LEN_FILE_NAME);
+		strncpy((char*)g_mp3_play_name, (const char*)(USART_RX_BUF+strlen(PLAY_MP3_MUSIC)), LEN_FILE_NAME);
+		printf("g_mp3_play_name = %s\n", g_mp3_play_name);
 
 		g_mp3_play = 1;
 	}

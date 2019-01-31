@@ -277,6 +277,13 @@ void hc08_msg_process(u8 *data, u16 num)
 	printf("\n");
 #endif
 
+    // Hook for IAP
+	if ((0x55 == data[0]) || (0xAA == data[1])) {
+        // TBD: Update Flash Flag
+        SoftReset();
+        return;
+    }
+
 	// Check Header
 	if ((data[0] != 0xA3) || (data[1] != 0xA4)) {
 		auto_err_report(4);

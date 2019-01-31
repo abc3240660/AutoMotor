@@ -1,12 +1,12 @@
-#include "sim900a.h" 
-#include "delay.h"	
-#include "led.h"     
-#include "w25qxx.h"  
+#include "sim900a.h"
+#include "delay.h"
+#include "led.h"
+#include "w25qxx.h"
 #include "malloc.h"
 #include "string.h"
-#include "usart3.h" 
-#include "ff.h" 
-#include "ucos_ii.h" 
+#include "usart3.h"
+#include "ff.h"
+#include "ucos_ii.h"
 #include "can1.h"
 #include "rfid.h"
 #include "MP3PLAY.H"
@@ -24,12 +24,12 @@ u8 g_door_state = 0;
 u8 g_power_state = 0;
 
 u8 g_iap_update = 0;
-u8 g_iap_update_name[128] = "";
+u8 g_iap_update_url[LEN_DW_URL+1] = "";
 
 u8 g_mp3_update = 0;
-u8 g_mp3_update_name[128] = "";
-u8 g_mp3_update_url[128] = "";
-u8 g_mp3_update_md5[64] = "";
+u8 g_mp3_update_md5[LEN_DW_MD5+1]   = "";
+u8 g_mp3_update_url[LEN_DW_URL+1]   = "";
+u8 g_mp3_update_name[LEN_FILE_NAME+1] = "";
 
 u32 g_dw_recved_sum = 0;
 u32 g_dw_size_total = 0;
@@ -75,7 +75,7 @@ void SoftReset(void);
 void write_logs(char *module, char *log, u16 size, u8 mode);
 
 extern u8 g_mp3_play;
-extern u8 g_mp3_play_name[32];
+extern u8 g_mp3_play_name[LEN_FILE_NAME+1];
 extern u8 g_calypso_card_id[CARD_ID_SIZE+1];
 extern u8 g_calypso_serial_num[SERIAL_NUM_SIZE+1];
 
@@ -100,7 +100,7 @@ const char* cmd_list[] = {
 	CMD_DEV_SHUTDOWN,
 	CMD_QUERY_GPS,
 	CMD_IAP_UPGRADE,
-	CMD_MP3_UPDATE,	
+	CMD_MP3_UPDATE,
 	CMD_MP3_PLAY,
 	CMD_START_TRACE,
 	CMD_STOP_TRACE,
@@ -206,7 +206,7 @@ u8 sim7500e_ipsta_check(u8 *sta)
 	return NULL;
 }
 
-u8 sim7500e_mp3_dw_check(void)
+u8 sim7500e_file_dw_check(void)
 {
 	u16 i = 0;
 	u16 size = 0;
@@ -280,7 +280,7 @@ u8 sim7500e_imei_check(void)
 	
 	memset(g_imei_str, 0, 16);
 	while(1) {
-		if ((USART3_RX_BUF_BAK[2+i]>='0') && (USART3_RX_BUF_BAK[2+i]<='9')) {// 2:\r\n
+		if ((USART3_RX_BUF_BAK[2+i]>='0') && (USART3_RX_BUF_BAK[2+i]<='9')) {
 			g_imei_str[i] = USART3_RX_BUF_BAK[2+i];
 		} else {
 			if ((USART3_RX_BUF_BAK[2+i]!='\r') && (USART3_RX_BUF_BAK[2+i]!='\n')) {
@@ -481,12 +481,12 @@ void sim7500e_tcp_send(char* send)
 {
 	printf("SEND:%s\n", send);
 	
-	if(sim7500e_send_cmd("AT+CIPSEND",">",40)==0)//发送数据
+	if(sim7500e_send_cmd("AT+CIPSEND",">",40)==0)
 	{
-		sim7500e_send_cmd((u8*)send,0,500);	//发送数据:0X00  
-		delay_ms(20);						//必须加延时
-		sim7500e_send_cmd((u8*)0X1A,"SEND OK",500);	//CTRL+Z,结束数据发送,启动一次传输	
-	}else sim7500e_send_cmd((u8*)0X1B,"OK",500);	//ESC,取消发送 	
+		sim7500e_send_cmd((u8*)send,0,500);
+		delay_ms(20);
+		sim7500e_send_cmd((u8*)0X1A,"SEND OK",500);
+	}else sim7500e_send_cmd((u8*)0X1B,"OK",500);
 }
 
 // DEV ACK
@@ -651,7 +651,9 @@ void sim7500e_do_mp3_play_ack()
 	char filename[64] = "";
 
 	memset(send_buf_main, 0, LEN_MAX_SEND);
-	sprintf(filename, "0:/MUSIC/%s", g_mp3_play_name);
+	if (strlen((const char*)g_mp3_play_name) < 40) {
+        sprintf(filename, "0:/MUSIC/%s", g_mp3_play_name);
+    }
 
 	if (0 == f_open(&f_txt,(const TCHAR*)filename, FA_READ)) {// existing
 		g_mp3_play = 1;
@@ -900,29 +902,29 @@ void sim7500e_parse_msg(char* msg)
 				// Do nothing
 			} else if (IAP_UPGRADE == cmd_type) {
 				g_iap_update = 1;
-				memset(g_iap_update_name, 0, 128);
-				strcpy((char*)g_iap_update_name, split_str);
-				printf("g_iap_update_name = %s\n", g_iap_update_name);
+				memset(g_iap_update_url, 0, LEN_DW_URL);
+				strncpy((char*)g_iap_update_url, split_str, LEN_DW_URL);
+				printf("g_iap_update_url = %s\n", g_iap_update_url);
 				sim7500e_do_iap_upgrade_ack();
 			} else if (MP3_PLAY == cmd_type) {
-				memset(g_mp3_play_name, 0, 32);
-				strcpy((char*)g_mp3_play_name, split_str);
+				memset(g_mp3_play_name, 0, LEN_FILE_NAME);
+				strncpy((char*)g_mp3_play_name, split_str, LEN_FILE_NAME);
 				printf("g_mp3_play_name = %s\n", g_mp3_play_name);
 				
 				sim7500e_do_mp3_play_ack();
 			} else if (MP3_UPDATE == cmd_type) {
 				if (4 == index) {
-					memset(g_mp3_update_name, 0, 128);
-					strcpy((char*)g_mp3_update_name, split_str);
+					memset(g_mp3_update_name, 0, LEN_FILE_NAME);
+					strncpy((char*)g_mp3_update_name, split_str, LEN_FILE_NAME);
 					printf("g_mp3_update_name = %s\n", g_mp3_update_name);
 				} else if (5 == index) {
 					g_mp3_update = 1;
-					memset(g_mp3_update_url, 0, 128);
-					strcpy((char*)g_mp3_update_url, split_str);
+					memset(g_mp3_update_url, 0, LEN_DW_URL);
+					strncpy((char*)g_mp3_update_url, split_str, LEN_DW_URL);
 					printf("g_mp3_update_url = %s\n", g_mp3_update_url);
 				} else if (6 == index) {
-					memset(g_mp3_update_md5, 0, 64);
-					strcpy((char*)g_mp3_update_md5, split_str);
+					memset(g_mp3_update_md5, 0, LEN_DW_MD5);
+					strncpy((char*)g_mp3_update_md5, split_str, LEN_DW_MD5);
 					printf("g_mp3_update_md5 = %s\n", g_mp3_update_md5);
 				}
 			} else if (START_TRACE == cmd_type) {
@@ -1095,11 +1097,17 @@ u8 sim7500e_setup_http(void)
 	if (sim7500e_send_cmd("AT+HTTPPARA=\"CID\",1","OK",500)) {
 		if (sim7500e_send_cmd("AT+HTTPPARA=\"CID\",1","OK",500)) return 1;
 	}
-	
-	sprintf(send_buf, "AT+HTTPPARA=\"URL\",\"%s\"", g_mp3_update_url);
+
+    if (g_mp3_update != 0) {
+        sprintf(send_buf, "AT+HTTPPARA=\"URL\",\"%s\"", g_mp3_update_url);
+    } else if (g_iap_update != 0) {
+        sprintf(send_buf, "AT+HTTPPARA=\"URL\",\"%s\"", g_iap_update_url);
+    }
+
 	//if (sim7500e_send_cmd("AT+HTTPPARA=\"URL\",\"http://gdlt.sc.chinaz.com/Files/DownLoad/sound1/201701/8224.wav\"","OK",1000)) {
 	//	if (sim7500e_send_cmd("AT+HTTPPARA=\"URL\",\"http://gdlt.sc.chinaz.com/Files/DownLoad/sound1/201701/8224.wav\"","OK",1000)) return 1;
 	//}
+
 	if (sim7500e_send_cmd((u8*)send_buf,"OK",500)) {
 		if (sim7500e_send_cmd((u8*)send_buf,"OK",500)) return 1;
 	}
@@ -1111,6 +1119,114 @@ u8 sim7500e_setup_http(void)
 	printf("g_dw_size_total = %d\n", g_dw_size_total);
 	
 	return 0;
+}
+
+void sim7500e_http_mp3()
+{
+	if (g_mp3_update != 0) {
+		u16 split_size = 0;
+
+		if (1 == g_mp3_update) {
+			u8 res = 0;
+			FIL f_txt;
+			u8 mp3_file[LEN_FILE_NAME+1] = "";
+
+			if (sim7500e_setup_http()) {
+				return;
+			}
+
+			if (strlen((const char*)g_mp3_update_name) > 40) {
+                printf("file name is too long\n");
+				return;
+			}
+
+            sprintf((char*)mp3_file, "0:/%s.wav", g_mp3_update_name);
+			res = f_open(&f_txt,(const TCHAR*)mp3_file,FA_READ|FA_WRITE|FA_CREATE_ALWAYS);
+			if (0 == res) {
+				f_close(&f_txt);
+			} else {
+				return;
+			}
+		}
+
+		if (g_dw_size_total > 0) {
+			g_mp3_update++;
+
+			// do http get
+			if ((split_size+g_dw_recved_sum) > g_dw_size_total) {
+				split_size = g_dw_size_total - g_dw_recved_sum;
+			} else {
+				split_size = U3_DATA_LEN_ONE;
+			}
+
+			sprintf(send_buf, "AT+HTTPREAD=%d,%d", g_dw_recved_sum, split_size);
+			if (0 == sim7500e_send_cmd((u8*)send_buf,"+HTTPREAD",500)) {
+				if (sim7500e_file_dw_check()) {
+					return;
+				}
+			}
+
+			printf("g_dw_recved_sum = %d\n", g_dw_recved_sum);
+			if (g_dw_recved_sum == g_dw_size_total) {
+				g_mp3_update = 0;
+                memset(g_mp3_update_md5, 0, LEN_DW_MD5);
+                memset(g_mp3_update_url, 0, LEN_DW_URL);
+                memset(g_mp3_update_name, 0, LEN_FILE_NAME);
+
+                g_dw_size_total = 0;
+                g_dw_recved_sum = 0;
+				sim7500e_do_mp3_dw_success_ack();
+			}
+		}
+	}
+}
+
+void sim7500e_http_iap()
+{
+	if (g_iap_update != 0) {
+		u16 split_size = 0;
+
+		if (1 == g_iap_update) {
+			u8 res = 0;
+			FIL f_txt;
+
+			if (sim7500e_setup_http()) {
+				return;
+			}
+
+			res = f_open(&f_txt,(const TCHAR*)"0:/TEST.BIN",FA_READ|FA_WRITE|FA_CREATE_ALWAYS);
+			if (0 == res) {
+				f_close(&f_txt);
+			} else {
+				return;
+			}
+		}
+
+		if (g_dw_size_total > 0) {
+			g_iap_update++;
+
+			if ((split_size+g_dw_recved_sum) > g_dw_size_total) {
+				split_size = g_dw_size_total - g_dw_recved_sum;
+			} else {
+				split_size = U3_DATA_LEN_ONE;
+			}
+
+			sprintf(send_buf, "AT+HTTPREAD=%d,%d", g_dw_recved_sum, split_size);
+			if (0 == sim7500e_send_cmd((u8*)send_buf,"+HTTPREAD",500)) {
+				if (sim7500e_file_dw_check()) {
+					return;
+				}
+			}
+
+			printf("g_dw_recved_sum = %d\n", g_dw_recved_sum);
+			if (g_dw_recved_sum == g_dw_size_total) {
+				g_iap_update = 0;
+				sim7500e_do_iap_upgrade_ack();
+                // TBD: Update Flash Flag
+                SoftReset();
+			}
+		}
+	}
 }
 
 void sim7500e_idle_actions(void)
@@ -1146,59 +1262,14 @@ void sim7500e_idle_actions(void)
 			sim7500e_do_gps_location_report();
 		}
 	}
-	if (g_iap_update) {
-		// do http get
-	}
 
 	if (g_mp3_update != 0) {
-		u16 split_size = 0;
+        sim7500e_http_mp3();
+        return;
+    }
 
-		if (1 == g_mp3_update) {
-			u8 res = 0;
-			FIL f_txt;
-			u8 mp3_file[32] = "";
-
-			if (sim7500e_setup_http()) {
-				return;
-			}
-
-			// file name is too long
-			if (strlen((const char*)g_mp3_update_name) > 20) {
-				return;
-			}
-			
-			sprintf((char*)mp3_file, "0:/%s.wav", g_mp3_update_name);
-			res = f_open(&f_txt,(const TCHAR*)mp3_file,FA_READ|FA_WRITE|FA_CREATE_ALWAYS);
-			if (0 == res) {
-				f_close(&f_txt);
-			} else {
-				return;
-			}
-		}
-
-		if (g_dw_size_total > 0) {
-			g_mp3_update++;
-
-			// do http get
-			if ((split_size+g_dw_recved_sum) > g_dw_size_total) {
-				split_size = g_dw_size_total - g_dw_recved_sum;
-			} else {
-				split_size = U3_DATA_LEN_ONE;
-			}
-
-			sprintf(send_buf, "AT+HTTPREAD=%d,%d", g_dw_recved_sum, split_size);
-			if (0 == sim7500e_send_cmd((u8*)send_buf,"+HTTPREAD",500)) {
-				if (sim7500e_mp3_dw_check()) {
-					return;
-				}
-			}
-
-			printf("g_dw_recved_sum = %d\n", g_dw_recved_sum);
-			if (g_dw_recved_sum == g_dw_size_total) {
-				g_mp3_update = 0;
-				sim7500e_do_mp3_dw_success_ack();
-			}
-		}
+	if (g_iap_update) {
+        sim7500e_http_iap();
 	}
 }
 

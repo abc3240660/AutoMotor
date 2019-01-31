@@ -19,50 +19,50 @@
 /////////////////////////UCOSII TASK///////////////////////////////////
 
 // Lowest Priority
-#define START_TASK_PRIO      			10
-#define START_STK_SIZE  				64
+#define START_TASK_PRIO                 10
+#define START_STK_SIZE                  64
 __align(8) static OS_STK START_TASK_STK[START_STK_SIZE];
-void start_task(void *pdata);	
- 			   
-#define LOWER_TASK_PRIO       			8
-#define LOWER_STK_SIZE  		    	128
-__align(8) static OS_STK LOWER_TASK_STK[LOWER_STK_SIZE];
-void lower_task(void *pdata);	
+void start_task(void *pdata);
 
-#define USART_TASK_PRIO       			7 
-#define USART_STK_SIZE  		    	512
+#define LOWER_TASK_PRIO                 8
+#define LOWER_STK_SIZE                  128
+__align(8) static OS_STK LOWER_TASK_STK[LOWER_STK_SIZE];
+void lower_task(void *pdata);
+
+#define USART_TASK_PRIO                 7
+#define USART_STK_SIZE                  512
 __align(8) static OS_STK USART_TASK_STK[USART_STK_SIZE];
 void usart_task(void *pdata);
-							 
-#define MAIN_TASK_PRIO       			6 
-#define MAIN_STK_SIZE  					1200
+
+#define MAIN_TASK_PRIO                  6
+#define MAIN_STK_SIZE                   1200
 __align(8) static OS_STK MAIN_TASK_STK[MAIN_STK_SIZE];
 void main_task(void *pdata);
 
-#define HIGHER_TASK_PRIO       			3 
-#define HIGHER_STK_SIZE  		   		256
+#define HIGHER_TASK_PRIO                3
+#define HIGHER_STK_SIZE                 256
 __align(8) static OS_STK HIGHER_TASK_STK[HIGHER_STK_SIZE];
 void higher_task(void *pdata);
 
-//////////////////////////////////////////////////////////////////////////////	 
+//////////////////////////////////////////////////////////////////////////////
 
 int total_ms = 0;
 int g_sd_existing = 0;
 
 OS_EVENT* sem_beep;
 
-u8 g_logname[64] = "";
-u8 g_logmsg[256] = "";
+u8 g_logname[LEN_FILE_NAME+1] = "";
+u8 g_logmsg[LEN_LOG_MSG] = "";
 
 u8 g_mp3_play = 0;
-u8 g_mp3_play_name[32] = "";
+u8 g_mp3_play_name[LEN_FILE_NAME+1] = "";
 
 u32 g_trip_meters = 0;
 u32 g_trip_meters_old = 0;
 u32 g_total_meters = 0;
 
 extern int pluse_num_new;
-extern u8 g_mp3_update_name[128];
+extern u8 g_mp3_update_name[LEN_FILE_NAME+1];
 extern u8 g_mp3_update;
 extern u8 g_dw_write_enable;
 extern vu16 g_data_pos;
@@ -73,22 +73,22 @@ extern void sim7500e_mobit_process(u8 index);
 void create_logfile(void);
 void write_logs(char *module, char *log, u16 size, u8 mode);
 
-//////////////////////////////////////////////////////////////////////////////	 
+//////////////////////////////////////////////////////////////////////////////
 
 void do_sd_check()
 {
 	u8 res = 0;
 	u16 temp = 0;
-	u32 dtsize = 0; 
+	u32 dtsize = 0;
 	u32 dfsize = 0;
 
- 	do {
+	do {
 		temp++;
- 		res = exf_getfree("0:",&dtsize,&dfsize);
-		delay_ms(200);		   
+		res = exf_getfree("0:",&dtsize,&dfsize);
+		delay_ms(200);
 	} while (res&&temp<5);
-	
- 	if (0 == res) {
+
+	if (0 == res) {
 		g_sd_existing = 1;
 		printf("Read SD OK!\r\n");
 	} else {
@@ -98,11 +98,11 @@ void do_sd_check()
 
 void do_sd_init()
 {
- 	exfuns_init();// alloc for fats
+	exfuns_init();// alloc for fats
 
 	// Call SD_Init internally
     f_mount(fs[0],"0:",1);
-	
+
 	do_sd_check();
 
 	create_logfile();
@@ -115,7 +115,7 @@ void mpu6050_init()
 	delay_ms(200);
 	while(mpu_dmp_init())
 	{
- 		delay_ms(200);
+		delay_ms(200);
 		//usart1_send_char('K');
 	}
 	//mpu_dmp_init();
@@ -126,7 +126,7 @@ void spiflash_init()
 {
 #if 0
 	W25QXX_Init();
-	
+
 	sys_env_init();
 
 	sys_env_save();
@@ -134,11 +134,9 @@ void spiflash_init()
 	sys_env_dump();
 
 	g_trip_meters_old = g_trip_meters;
-	
+
 	while(1);
 #endif
-
-
 }
 
 void do_vs_test()
@@ -153,8 +151,8 @@ void do_vs_test()
 	while(1)
 	{
 		delay_ms(1000);
- 		//LED1=0; 	   
- 		VS_Sine_Test();	   	 
+		//LED1=0;
+		VS_Sine_Test();
 		delay_ms(1000);
 		//LED1=1;
 	}
@@ -180,60 +178,60 @@ void system_init(void)
 
 	My_RTC_Init();
 	RTC_Set_WakeUp(RTC_WakeUpClock_CK_SPRE_16bits,0);
-		
+
 	printf("SmartMotor Starting...\n");
 	CAN1_Mode_Init(CAN1_mode);// 250Kbps
-	CAN2_Mode_Init(CAN2_mode);// 500Kbps 
-  
+	CAN2_Mode_Init(CAN2_mode);// 500Kbps
+
 	my_mem_init(SRAMIN);
 	my_mem_init(SRAMCCM);
 
-	TIM2_Init(9999,8399);	
+	TIM2_Init(9999,8399);
 	TIM4_Init(9999,8399);
-	
+
 	// VS_Init();
-  
+
 	mpu6050_init();
 
 	delay_ms(1500);
-	
+
 	do_sd_init();
 
 	// do_vs_test();
-}   
+}
 
 void SoftReset(void)
-{  
+{
 	while (1) {
 		delay_ms(1000);
 	}
 	__set_FAULTMASK(1);
- 	NVIC_SystemReset();
+	NVIC_SystemReset();
 }
 
 int main(void)
-{ 	
-//	SCB->VTOR = *((u32 *)0x0800FFF8);
+{
+    // SCB->VTOR = *((u32 *)0x0800FFF8);
 	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
 	system_init();
- 	OSInit();
- 	OSTaskCreate(start_task,(void *)0,(OS_STK *)&START_TASK_STK[START_STK_SIZE-1],START_TASK_PRIO);
+	OSInit();
+	OSTaskCreate(start_task,(void *)0,(OS_STK *)&START_TASK_STK[START_STK_SIZE-1],START_TASK_PRIO);
 	OSStart();
 }
 
 void start_task(void *pdata)
-{  
+{
 	OS_CPU_SR cpu_sr = 0;
-	pdata = pdata; 	   
+	pdata = pdata;
 	sem_beep = OSSemCreate(1);
 
 	OSStatInit();
-	
+
 	OS_ENTER_CRITICAL();
- 	//OSTaskCreate(main_task,(void *)0,(OS_STK*)&MAIN_TASK_STK[MAIN_STK_SIZE-1],MAIN_TASK_PRIO);						   
- 	//OSTaskCreate(usart_task,(void *)0,(OS_STK*)&USART_TASK_STK[USART_STK_SIZE-1],USART_TASK_PRIO);						   
-	//OSTaskCreate(higher_task,(void *)0,(OS_STK*)&HIGHER_TASK_STK[HIGHER_STK_SIZE-1],HIGHER_TASK_PRIO); 					   
-	//OSTaskCreate(lower_task,(void *)0,(OS_STK*)&LOWER_TASK_STK[LOWER_STK_SIZE-1],LOWER_TASK_PRIO); 					   
+	//OSTaskCreate(main_task,(void *)0,(OS_STK*)&MAIN_TASK_STK[MAIN_STK_SIZE-1],MAIN_TASK_PRIO);
+	//OSTaskCreate(usart_task,(void *)0,(OS_STK*)&USART_TASK_STK[USART_STK_SIZE-1],USART_TASK_PRIO);
+	//OSTaskCreate(higher_task,(void *)0,(OS_STK*)&HIGHER_TASK_STK[HIGHER_STK_SIZE-1],HIGHER_TASK_PRIO);
+	//OSTaskCreate(lower_task,(void *)0,(OS_STK*)&LOWER_TASK_STK[LOWER_STK_SIZE-1],LOWER_TASK_PRIO);
 	//OSTaskSuspend(START_TASK_PRIO);
 
 	OS_EXIT_CRITICAL();
@@ -271,9 +269,9 @@ void write_logs(char *module, char *log, u16 size, u8 mode)
 		u32 br;
 		FIL f_txt;
 		RTC_TimeTypeDef RTC_TimeStruct;
-		
+
 		RTC_GetTime(RTC_Format_BIN,&RTC_TimeStruct);
-		
+
 		memset(g_logmsg, 0, 256);
 		
 		if (0 == mode) {
@@ -285,7 +283,7 @@ void write_logs(char *module, char *log, u16 size, u8 mode)
 		} else {
 			sprintf((char*)g_logmsg,"%02d%02d%02d:OTHR Data(%s) %s\n",RTC_TimeStruct.RTC_Hours,RTC_TimeStruct.RTC_Minutes,RTC_TimeStruct.RTC_Seconds,module,log);
 		}
-		
+
 		printf("%s", g_logmsg);
 		
 		OSSemPend(sem_beep,0,&err);
@@ -329,13 +327,13 @@ void usart1_report_imu(short aacx,short aacy,short aacz,short gyrox,short gyroy,
 	tbuf[2]=(aacy>>8)&0XFF;
 	tbuf[3]=aacy&0XFF;
 	tbuf[4]=(aacz>>8)&0XFF;
-	tbuf[5]=aacz&0XFF; 
+	tbuf[5]=aacz&0XFF;
 	tbuf[6]=(gyrox>>8)&0XFF;
 	tbuf[7]=gyrox&0XFF;
 	tbuf[8]=(gyroy>>8)&0XFF;
 	tbuf[9]=gyroy&0XFF;
 	tbuf[10]=(gyroz>>8)&0XFF;
-	tbuf[11]=gyroz&0XFF;	
+	tbuf[11]=gyroz&0XFF;
 	tbuf[18]=(roll>>8)&0XFF;
 	tbuf[19]=roll&0XFF;
 	tbuf[20]=(pitch>>8)&0XFF;
@@ -343,7 +341,7 @@ void usart1_report_imu(short aacx,short aacy,short aacz,short gyrox,short gyroy,
 	tbuf[22]=(yaw>>8)&0XFF;
 	tbuf[23]=yaw&0XFF;
 	usart1_niming_report(0XAF,tbuf,28);//∑…øÿœ‘ æ÷°,0XAF
-} 
+}
 
 void MPU6050_Risk_Check()
 {
@@ -392,7 +390,7 @@ void lower_task(void *pdata)
 			}
 
 			g_mp3_play = 0;
-			memset(g_mp3_play_name, 0, 32);
+			memset(g_mp3_play_name, 0, LEN_FILE_NAME);
 		}
 
 #ifdef HC08_ENABLE
@@ -421,8 +419,8 @@ void lower_task(void *pdata)
 		}
 #endif
 		// printf("test lower task\n");
-		
-	   	OSTimeDlyHMSM(0,0,0,500);// 500ms
+
+        OSTimeDlyHMSM(0,0,0,500);// 500ms
 	}
 }
 
@@ -455,7 +453,7 @@ void main_task(void *pdata)
 			// sys_env_save();
 		}
 
-   		OSTimeDlyHMSM(0,0,0,100);// 500ms
+		OSTimeDlyHMSM(0,0,0,100);// 500ms
 	}
 }
 
@@ -467,12 +465,12 @@ void usart_task(void *pdata)
 		if ((UART5_RX_STA&(1<<15)) != 0) {
 			cpr74_read_calypso();
 			UART5_RX_STA = 0;
-    	}
+	}
 
-		if (loop_cnt++ == 3) {
-			loop_cnt = 0;
-        	// printf("Hall Counter = %d\n", pluse_num_new);
-		}
+	if (loop_cnt++ == 3) {
+		loop_cnt = 0;
+        // printf("Hall Counter = %d\n", pluse_num_new);
+	}
 
 		if (1 == g_dw_write_enable) {
 			if (1 == g_sd_existing) {
@@ -480,7 +478,7 @@ void usart_task(void *pdata)
 				u8 res = 0;
 				FIL f_txt;
 				u8 mp3_file[32] = "";
-			
+
 				sprintf((char*)mp3_file, "0:/%s.wav", g_mp3_update_name);
 				res = f_open(&f_txt,(const TCHAR*)mp3_file,FA_READ|FA_WRITE);
 				if (0 == res) {
@@ -489,7 +487,7 @@ void usart_task(void *pdata)
 					f_close(&f_txt);
 				}
 			}
-			
+
 			g_dw_write_enable = 0;
 		}
 
@@ -502,7 +500,7 @@ void higher_task(void *pdata)
 {
 	while (1) {
 		sim7500e_communication_loop(0,NULL,NULL);
-	    OSTimeDlyHMSM(0,0,0,500);// 500ms
+        OSTimeDlyHMSM(0,0,0,500);// 500ms
 	}
 }
 
@@ -512,19 +510,19 @@ void HardFault_Handler(void)
 	u8 t=0;
 	u32 temp;
 	temp=SCB->CFSR;
- 	printf("CFSR:%8X\r\n",temp);
+	printf("CFSR:%8X\r\n",temp);
 	temp=SCB->HFSR;
- 	printf("HFSR:%8X\r\n",temp);
- 	temp=SCB->DFSR;
- 	printf("DFSR:%8X\r\n",temp);
-   	temp=SCB->AFSR;
- 	printf("AFSR:%8X\r\n",temp);
- 	// LED1=!LED1;
- 	while(t<5)
+	printf("HFSR:%8X\r\n",temp);
+	temp=SCB->DFSR;
+	printf("DFSR:%8X\r\n",temp);
+	temp=SCB->AFSR;
+	printf("AFSR:%8X\r\n",temp);
+	// LED1=!LED1;
+	while(t<5)
 	{
 		t++;
 		LED2=!LED2;
 		//BEEP=!BEEP;
 		for(i=0;i<0X1FFFFF;i++);
- 	}
+	}
 }
