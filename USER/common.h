@@ -20,6 +20,11 @@
 // #define HC08_ENABLE 1
 // #define MPU_ENABLE 1
 
+#define LEN_FILE_NAME   64
+#define LEN_DW_MD5      64
+#define LEN_DW_URL      128
+#define LEN_LOG_MSG     256
+
 #define	app_pi	3.1415926535897932384626433832795 
 /////////////////////////////////////////////////////////////////////////
 

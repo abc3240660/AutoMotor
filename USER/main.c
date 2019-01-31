@@ -203,9 +203,11 @@ void system_init(void)
 
 void SoftReset(void)
 {
+#if 0
 	while (1) {
 		delay_ms(1000);
 	}
+#endif
 	__set_FAULTMASK(1);
 	NVIC_SystemReset();
 }

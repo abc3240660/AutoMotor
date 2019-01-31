@@ -68,11 +68,6 @@ extern __sim7500dev sim7500dev;
 // BIT8~9: 0-N,1-P,2-D,3-R
 #define BIT_GEAR_STA     (1 << 8) // DangWei
 
-#define LEN_FILE_NAME   64
-#define LEN_DW_MD5      64
-#define LEN_DW_URL      128
-#define LEN_LOG_MSG     256
-
 extern u16 g_car_sta;
 
 enum CMD_TYPE {
